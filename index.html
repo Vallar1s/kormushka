@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href="manifest.json">
   <title>Кормушка</title>
   <style>
     :root {
@@ -318,11 +317,14 @@
   const DB = "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app";
   const PASS = '1321';
 
-  // ----- Утилиты -----
+  // ----- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И УТИЛИТЫ -----
+  let selectedDays = new Set();
+  let sensorTimer, logTimer;
+
   const get = (path) => fetch(DB + path + '.json').then(r => r.json());
   const put = (path, data) => fetch(DB + path + '.json', { method: 'PUT', body: JSON.stringify(data) });
 
-  // ----- Авторизация -----
+  // ----- АВТОРИЗАЦИЯ -----
   if (localStorage.getItem('auth') === '1') {
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -336,22 +338,19 @@
     } else alert('Неверный пароль');
   };
 
-  // ----- Инициализация -----
-  let selectedDays = new Set();
-  let currentTab = 'dash';
-  let sensorTimer, logTimer;
-
+  // ----- ИНИЦИАЛИЗАЦИЯ -----
   function initApp() {
     setupTabs();
     setupDaysChips();
     refreshSensors();
     refreshLog();
+    renderSchedule();
     checkStatus();
     sensorTimer = setInterval(refreshSensors, 3000);
     logTimer = setInterval(refreshLog, 10000);
   }
 
-  // ----- Табы -----
+  // ----- ТАБЫ -----
   function setupTabs() {
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -360,12 +359,11 @@
         const target = tab.dataset.tab;
         document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
         document.getElementById(target).classList.add('active');
-        currentTab = target;
       });
     });
   }
 
-  // ----- Датчики и статус -----
+  // ----- ДАТЧИКИ И СТАТУС -----
   async function refreshSensors() {
     try {
       const sensors = await get('/sensors');
@@ -408,7 +406,7 @@
     if (status) document.getElementById('lastEvent').textContent = status;
   }
 
-  // ----- Лог -----
+  // ----- ЛОГ -----
   async function refreshLog() {
     const logs = await get('/logs');
     const list = document.getElementById('logList');
@@ -422,9 +420,9 @@
     }).join('');
   }
 
-  async function loadLogs() { await refreshLog(); }
+  window.loadLogs = () => refreshLog();
 
-  // ----- Кормление -----
+  // ----- КОРМЛЕНИЕ -----
   window.feed = async () => {
     await put('/feed_command', true);
     showBanner('Команда отправлена');
@@ -438,7 +436,7 @@
     showBanner('Отложенное кормление запланировано');
   };
 
-  // ----- Расписание -----
+  // ----- РАСПИСАНИЕ -----
   function setupDaysChips() {
     document.querySelectorAll('#daysSelect .chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -455,11 +453,9 @@
     const [h, m] = time.split(':').map(Number);
     const days = Array.from(selectedDays).map(Number);
     if (days.length === 0) return alert('Выберите дни');
-    // Сохраняем в Firebase
     const sched = await get('/schedule') || [];
     sched.push({ days, hour: h, minute: m, active: true });
     await put('/schedule', sched);
-    // Также отправляем команду ESP32 для немедленного обновления (или оно само подхватит при следующем чтении)
     await put('/schedule_save', sched);
     renderSchedule(sched);
   };
@@ -481,7 +477,7 @@
     renderSchedule();
   };
 
-  // ----- Калибровка -----
+  // ----- КАЛИБРОВКА -----
   window.calibrate = (sensor, type) => {
     put('/calibrate', { sensor, type });
     showBanner('Запрос калибровки отправлен');
@@ -493,7 +489,7 @@
     showBanner('Порция сохранена');
   };
 
-  // ----- Пароль -----
+  // ----- ПАРОЛЬ -----
   window.changePassword = () => {
     const newPass = document.getElementById('newPass').value;
     if (!newPass) return;
@@ -506,7 +502,7 @@
     location.reload();
   };
 
-  // ----- Баннер уведомлений -----
+  // ----- БАННЕР -----
   function showBanner(msg) {
     const banner = document.getElementById('banner');
     banner.textContent = msg;
