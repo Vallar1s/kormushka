@@ -9,7 +9,6 @@
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>🐱 Кормушка (Firebase + Анимации)</title>
   <style>
-    /* ======== ВСЕ СТИЛИ И АНИМАЦИИ (без изменений, кроме пары улучшений для доступности) ======== */
     :root {
       --bg: #f2f2f7;
       --card-bg: rgba(255,255,255,0.75);
@@ -72,8 +71,6 @@
       opacity: 1;
       transform: translateY(0);
     }
-    /* Экран входа больше не нужен – удалён из HTML, но стиль оставим для совместимости (если где-то осталось) */
-    #login-screen { display: none; }
     #app-screen.hidden { display: none; }
     .card {
       background: var(--card-bg);
@@ -90,24 +87,14 @@
     .card:nth-child(2) { animation-delay: 0.1s; }
     .card:nth-child(3) { animation-delay: 0.15s; }
     .card:nth-child(4) { animation-delay: 0.2s; }
-    .card:nth-child(5) { animation-delay: 0.25s; }
-    .row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
+    .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .label {
       font-size: 13px;
       color: var(--secondary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
-    .value {
-      font-size: 24px;
-      font-weight: 600;
-      transition: color 0.3s;
-    }
+    .value { font-size: 24px; font-weight: 600; transition: color 0.3s; }
     .btn {
       display: block;
       width: 100%;
@@ -139,13 +126,8 @@
       opacity: 0;
     }
     .btn:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(0,122,255,0.2); }
-    .btn:active::after {
-      width: 300px; height: 300px;
-      opacity: 1;
-    }
-    .btn:focus-visible {
-      box-shadow: 0 0 0 3px rgba(0,122,255,0.5);
-    }
+    .btn:active::after { width: 300px; height: 300px; opacity: 1; }
+    .btn:focus-visible { box-shadow: 0 0 0 3px rgba(0,122,255,0.5); }
     .btn.secondary {
       background: transparent;
       color: var(--accent);
@@ -153,11 +135,7 @@
       box-shadow: none;
     }
     .btn.secondary:active { background: rgba(0,122,255,0.1); }
-    /* Стили для отключённой кнопки во время отправки */
-    .btn:disabled {
-      opacity: 0.6;
-      pointer-events: none;
-    }
+    .btn:disabled { opacity: 0.6; pointer-events: none; }
     .status-dot {
       display: inline-block;
       width: 10px;
@@ -223,10 +201,7 @@
       outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
     }
-    .input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(0,122,255,0.2);
-    }
+    .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,122,255,0.2); }
     .chip {
       display: inline-block;
       padding: 6px 14px;
@@ -237,7 +212,6 @@
       font-size: 14px;
       cursor: pointer;
       transition: all 0.2s ease;
-      transform: scale(1);
     }
     .chip:hover { transform: scale(1.05); }
     .chip:active { transform: scale(0.95); }
@@ -300,8 +274,6 @@
     .filter-btn.active { background: var(--accent); color: white; }
     .hidden { display: none !important; }
     .text-center { text-align: center; }
-    .error-message { color: var(--red); margin-top: 8px; }
-
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(30px); }
       to { opacity: 1; transform: translateY(0); }
@@ -332,7 +304,6 @@
   <button class="close-banner" aria-label="Закрыть уведомление" onclick="hideBanner()">✕</button>
 </div>
 
-<!-- Основной экран (больше нет экрана входа) -->
 <div id="app-screen">
   <div class="header">🐱 Кормушка</div>
   
@@ -362,7 +333,6 @@
         <span id="bakPct" style="font-size:16px; font-weight:500; color:var(--secondary);">0%</span>
       </div>
     </div>
-    <!-- Админ-панель всегда видна, класс hidden убран -->
     <div id="adminControls" class="card">
       <button class="btn" onclick="feedNow()">🥣 Покормить сейчас</button>
       <div style="margin:12px 0; display:flex; gap:8px;">
@@ -422,7 +392,6 @@
     <div class="card text-center">
       <p style="color:var(--secondary); font-size:13px;">Версия Firebase • Анимации ✨</p>
     </div>
-    <!-- Кнопка выхода больше не нужна -->
   </div>
 
   <div class="tab-bar" role="tablist">
@@ -445,12 +414,10 @@
   </div>
 </div>
 
-<!-- Firebase SDK – только нужные модули -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
   import { getDatabase, ref, get as dbGet, set, onValue, off, push, remove, query, orderByKey, limitToLast } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-  // ⚠️ КОНФИГУРАЦИЯ ТВОЕГО ПРОЕКТА (оставь как было)
   const firebaseConfig = {
     apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
     authDomain: "kormushka-app.firebaseapp.com",
@@ -465,11 +432,9 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
   let selectedDays = new Set();
   let bannerTimeout = null;
 
-  // ========== УТИЛИТЫ ==========
   function sanitizeHTML(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -490,33 +455,25 @@
     if (bannerTimeout) clearTimeout(bannerTimeout);
   };
 
-  // Запрос разрешения на уведомления при старте
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();
   }
 
-  // ========== ИНИЦИАЛИЗАЦИЯ ПОСЛЕ ЗАГРУЗКИ DOM ==========
   document.addEventListener('DOMContentLoaded', () => {
-    // Показываем основной экран (логин-скрин удалён)
-    const appScreen = document.getElementById('app-screen');
-    appScreen.classList.remove('hidden');
-    // Админ-панель всегда видна
+    document.getElementById('app-screen').classList.remove('hidden');
     document.getElementById('adminControls').classList.remove('hidden');
-
     initApp();
   });
 
-  // ========== ОСНОВНАЯ ИНИЦИАЛИЗАЦИЯ ==========
   let unsubscribes = [];
 
   function initApp() {
     setupTabs();
     setupDaysChips();
-    loadPortionTime(); // загрузить сохранённую порцию
+    loadPortionTime();
 
-    // Подписка на датчики
     const sensorsRef = ref(db, 'sensors');
-    const unsubSensors = onValue(sensorsRef, (snapshot) => {
+    unsubscribes.push(onValue(sensorsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         updateSensorUI(data);
@@ -524,74 +481,56 @@
       } else {
         setOnline(false);
       }
-    });
-    unsubscribes.push(unsubSensors);
+    }));
 
-    // WiFi RSSI
     const rssiRef = ref(db, 'wifi_rssi');
-    const unsubRssi = onValue(rssiRef, (snapshot) => {
+    unsubscribes.push(onValue(rssiRef, (snapshot) => {
       document.getElementById('wifiStrength').textContent = snapshot.val() !== null ? `${snapshot.val()} dBm` : '-- dBm';
-    });
-    unsubscribes.push(unsubRssi);
+    }));
 
-    // Логи – теперь запрашиваем последние 100 записей, сортировка на сервере
     const logsRef = query(ref(db, 'logs'), orderByKey(), limitToLast(100));
-    const unsubLogs = onValue(logsRef, (snapshot) => {
+    unsubscribes.push(onValue(logsRef, (snapshot) => {
       historyLog.processData(snapshot.val());
-    });
-    unsubscribes.push(unsubLogs);
+    }));
 
-    // Расписание – теперь это объект с ключами
     const scheduleRef = ref(db, 'schedule');
-    const unsubSchedule = onValue(scheduleRef, (snapshot) => {
+    unsubscribes.push(onValue(scheduleRef, (snapshot) => {
       renderSchedule(snapshot.val());
-    });
-    unsubscribes.push(unsubSchedule);
+    }));
 
-    // DND
     const dndRef = ref(db, 'schedule_paused');
-    const unsubDnd = onValue(dndRef, (snapshot) => {
+    unsubscribes.push(onValue(dndRef, (snapshot) => {
       const paused = snapshot.val();
       const btn = document.getElementById('dndToggle');
       btn.textContent = paused ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
-    });
-    unsubscribes.push(unsubDnd);
+    }));
 
-    // Калибровка – подписка в реальном времени
     const calibrationRef = ref(db, 'calibration');
-    const unsubCal = onValue(calibrationRef, (snapshot) => {
+    unsubscribes.push(onValue(calibrationRef, (snapshot) => {
       calibration = snapshot.val() || { miska: {}, bak: {} };
-      // пересчитать бары при изменении калибровки
-      const sensorsSnap = document.getElementById('miskaVal').textContent;
-      // Мы можем заново прочитать значения из датчиков (уже есть в UI)
       updateBarsFromCurrentValues();
-    });
-    unsubscribes.push(unsubCal);
+    }));
 
-    // Подписка на low_food_alert вместо интервала
     const lowFoodRef = ref(db, 'low_food_alert');
-    const unsubLow = onValue(lowFoodRef, (snapshot) => {
+    unsubscribes.push(onValue(lowFoodRef, (snapshot) => {
       if (snapshot.val() === true) {
         showBanner('⚠️ В баке заканчивается корм!');
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('🐱 Кормушка', { body: 'В баке заканчивается корм!', icon: '/icon-192.png' });
         }
       }
-    });
-    unsubscribes.push(unsubLow);
+    }));
 
-    // Очистка при закрытии окна (не обязательно, но хорошо)
     window.addEventListener('beforeunload', () => {
       unsubscribes.forEach(fn => fn());
     });
   }
 
-  // ========== ТАБЫ (доступность) ==========
   function setupTabs() {
     document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', (e) => {
+      tab.addEventListener('click', () => {
         switchTab(tab.dataset.tab);
-        tab.focus(); // перемещаем фокус
+        tab.focus();
       });
       tab.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -599,7 +538,6 @@
           switchTab(tab.dataset.tab);
           tab.focus();
         }
-        // Стрелки влево/вправо для tablist
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
           e.preventDefault();
           const tabs = Array.from(document.querySelectorAll('.tab'));
@@ -629,7 +567,6 @@
     }
   }
 
-  // ========== ДАТЧИКИ ==========
   function updateSensorUI(s) {
     document.getElementById('miskaVal').textContent = s.miska != null ? `${s.miska} см` : '-- см';
     document.getElementById('bakVal').textContent = s.bak != null ? `${s.bak} см` : '-- см';
@@ -639,7 +576,6 @@
 
   let calibration = { miska: {}, bak: {} };
 
-  // Вызывается при изменении калибровки, чтобы пересчитать бары без новых данных датчиков
   function updateBarsFromCurrentValues() {
     const miskaText = document.getElementById('miskaVal').textContent;
     const bakText = document.getElementById('bakVal').textContent;
@@ -654,7 +590,7 @@
     const bar = document.getElementById(type+'Bar');
     const pctEl = document.getElementById(type+'Pct');
     const barContainer = bar.parentElement;
-    if (cal && cal.empty != null && cal.full != null && dist != null && cal.full < cal.empty) {
+    if (cal && cal.empty != null && cal.full != null && dist != null && !isNaN(dist) && cal.full < cal.empty) {
       let pct = ((cal.empty - dist) / (cal.empty - cal.full)) * 100;
       pct = Math.max(0, Math.min(100, pct));
       bar.style.height = pct + '%';
@@ -674,13 +610,12 @@
       '<span class="status-dot" style="background:var(--red)"></span> Офлайн';
   }
 
-  // ========== КОРМЛЕНИЕ (без проверки прав) ==========
   window.feedNow = async () => {
     const btn = event.target;
     btn.disabled = true;
     btn.textContent = 'Отправка...';
     try {
-      await set(ref(db, 'feed_command'), true);
+      await set(ref(db, 'feed_command'), { type: 'manual' }); // отправляем объект с типом
       showBanner('Команда отправлена');
     } catch (e) {
       showBanner('Ошибка: ' + e.message);
@@ -698,8 +633,8 @@
     btn.disabled = true;
     btn.textContent = 'Сохранение...';
     try {
-      // Используем push для хранения нескольких отложенных кормлений
-      await push(ref(db, 'feed_later'), { hours: h, minutes: m });
+      // Записываем одиночный объект, ESP ожидает именно такую структуру
+      await set(ref(db, 'feed_later'), { hours: h, minutes: m });
       showBanner('Отложенное кормление запланировано');
     } catch (e) {
       showBanner('Ошибка: ' + e.message);
@@ -709,7 +644,6 @@
     }
   };
 
-  // ========== РАСПИСАНИЕ (переделано на push/remove) ==========
   function setupDaysChips() {
     document.querySelectorAll('#daysSelect .chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -732,9 +666,7 @@
     btn.disabled = true;
     btn.textContent = 'Добавление...';
     try {
-      const newEntry = { days, hour: h, minute: m, active: true };
-      await push(ref(db, 'schedule'), newEntry);
-      // Сброс выбора
+      await push(ref(db, 'schedule'), { days, hour: h, minute: m, active: true });
       selectedDays.clear();
       document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
       showBanner('Расписание обновлено');
@@ -770,7 +702,6 @@
     }).join('');
   }
 
-  // ========== DND ==========
   window.toggleDND = async () => {
     const snap = await dbGet(ref(db, 'schedule_paused'));
     const newState = !snap.val();
@@ -782,7 +713,6 @@
     }
   };
 
-  // ========== ЛОГ (исправлена обработка null, фильтрация) ==========
   const historyLog = {
     filter: 'all',
     setFilter(type, btn) {
@@ -793,7 +723,6 @@
     },
     processData(logs) { this.render(logs); },
     refresh() {
-      // Принудительно перечитать последние 100
       dbGet(query(ref(db, 'logs'), orderByKey(), limitToLast(100)))
         .then(snap => this.render(snap.val()))
         .catch(e => showBanner('Ошибка загрузки логов: ' + e.message));
@@ -823,7 +752,6 @@
     }
   };
 
-  // ========== НАСТРОЙКИ ==========
   window.calibrate = async (sensor, type) => {
     try {
       await set(ref(db, 'calibrate'), { sensor, type });
@@ -850,9 +778,7 @@
       if (snap.exists()) {
         document.getElementById('portionTimeInput').value = snap.val();
       }
-    } catch (e) {
-      // не критично
-    }
+    } catch (e) {}
   }
 </script>
 </body>
