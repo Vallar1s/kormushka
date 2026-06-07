@@ -1,42 +1,121 @@
 <!DOCTYPE html>
-<html><body>
-<h2>Тест WebSocket (WSS)</h2>
-<ul id="results"></ul>
-<script>
-const tests = [
-  { name: "test.mosquitto.org:8080", url: "wss://test.mosquitto.org:8080/mqtt" },
-  { name: "broker.hivemq.com:8884", url: "wss://broker.hivemq.com:8884/mqtt" },
-  { name: "broker.emqx.io:8084", url: "wss://broker.emqx.io:8084/mqtt" }
-];
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Кормушка</title>
+  <style>
+    :root { --bg: #f2f2f7; --card: #fff; --text: #1c1c1e; --secondary: #8e8e93; --accent: #007aff; --red: #ff3b30; --green: #34c759; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #000; --card: #1c1c1e; --text: #fff; --secondary: #98989d; } }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 500px; margin: auto; }
+    .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .label { font-size: 15px; color: var(--secondary); text-transform: uppercase; }
+    .value { font-size: 22px; font-weight: 600; }
+    .btn { display: block; width: 100%; padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 14px; font-size: 18px; font-weight: 600; margin-top: 12px; cursor: pointer; }
+    .btn:active { opacity: 0.8; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 10px; font-size: 16px; margin: 8px 0; background: var(--bg); color: var(--text); }
+    .bar-container { width: 30px; height: 100px; background: var(--secondary); border-radius: 6px; overflow: hidden; margin-right: 10px; }
+    .bar-fill { width: 100%; background: var(--accent); transition: height 0.5s; }
+    .flex { display: flex; align-items: center; gap: 12px; }
+  </style>
+</head>
+<body>
+<div id="login" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:90vh;">
+  <h2>🐱 Кормушка</h2>
+  <input type="password" id="pass" class="input" placeholder="Пароль" style="max-width:260px">
+  <button class="btn" style="max-width:260px" onclick="login()">Войти</button>
+</div>
 
-function runTest(index) {
-  if (index >= tests.length) return;
-  let li = document.createElement("li");
-  li.textContent = tests[index].name + ": проверка...";
-  document.getElementById("results").appendChild(li);
-  try {
-    let ws = new WebSocket(tests[index].url);
-    let timeout = setTimeout(() => {
-      ws.close();
-      li.textContent += " ❌ timeout";
-      runTest(index+1);
-    }, 5000);
-    ws.onopen = () => {
-      clearTimeout(timeout);
-      li.textContent += " ✅ успех";
-      ws.close();
-      runTest(index+1);
-    };
-    ws.onerror = () => {
-      clearTimeout(timeout);
-      li.textContent += " ❌ ошибка";
-      runTest(index+1);
-    };
-  } catch(e) {
-    li.textContent += " ❌ исключение: " + e;
-    runTest(index+1);
+<div id="app" style="display:none;">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h2>🐱 Кормушка</h2>
+    <span id="conn">🟡</span>
+  </div>
+  <div class="card">
+    <div class="row"><span class="label">Миска</span><span class="value" id="miska">-- см</span></div>
+    <div class="row"><span class="label">Бак</span><span class="value" id="bak">-- см</span></div>
+    <div class="flex" style="margin-top:8px;">
+      <div class="bar-container"><div class="bar-fill" id="bakBar" style="height:0%"></div></div>
+      <span id="bakPct">0%</span>
+    </div>
+  </div>
+  <button class="btn" onclick="feed()">🥣 Покормить сейчас</button>
+  <div style="display:flex; gap:8px; margin:12px 0;">
+    <input type="number" id="delayH" placeholder="Часы" class="input" style="flex:1;">
+    <input type="number" id="delayM" placeholder="Минуты" class="input" style="flex:1;">
+    <button class="btn" style="margin-top:0; flex:1;" onclick="feedLater()">⏳ Отложить</button>
+  </div>
+  <div class="card" id="lastEvent" style="font-size:14px; color:var(--secondary);">Нет событий</div>
+</div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+  const firebaseConfig = {
+    databaseURL: "https://kormushka-app-default-rtdb.firebaseio.com/"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const PASSWORD = '1321';
+
+  if (localStorage.getItem('auth') === '1') {
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    initApp();
   }
-}
-runTest(0);
+
+  window.login = function() {
+    if (document.getElementById('pass').value === PASSWORD) {
+      localStorage.setItem('auth', '1');
+      location.reload();
+    } else alert('Неверный пароль');
+  };
+
+  function initApp() {
+    const miskaRef = ref(db, 'sensors/miska');
+    const bakRef = ref(db, 'sensors/bak');
+    const statusRef = ref(db, 'status');
+
+    onValue(miskaRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val !== null) document.getElementById('miska').textContent = val.toFixed(1) + ' см';
+      document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--green)"></span>';
+    });
+    onValue(bakRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val !== null) {
+        document.getElementById('bak').textContent = val.toFixed(1) + ' см';
+        let empty = parseFloat(localStorage.getItem('bakEmpty') || 35);
+        let full = parseFloat(localStorage.getItem('bakFull') || 5);
+        if (full < empty) {
+          let pct = ((empty - val) / (empty - full)) * 100;
+          pct = Math.max(0, Math.min(100, pct));
+          document.getElementById('bakBar').style.height = pct + '%';
+          document.getElementById('bakPct').textContent = Math.round(pct) + '%';
+        }
+      }
+    });
+    onValue(statusRef, (snapshot) => {
+      const val = snapshot.val();
+      if (val) document.getElementById('lastEvent').textContent = val;
+    });
+
+    window.feed = function() {
+      set(ref(db, 'feed_command'), true);
+    };
+    window.feedLater = function() {
+      let h = parseInt(document.getElementById('delayH').value) || 0;
+      let m = parseInt(document.getElementById('delayM').value) || 0;
+      if (h===0 && m===0) return alert('Введите время');
+      set(ref(db, 'feed_later'), { hours: h, minutes: m });
+      alert('Запланировано');
+    };
+  }
 </script>
-</body></html>
+</body>
+</html>
