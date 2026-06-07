@@ -73,7 +73,6 @@
       margin-bottom: 16px;
       box-shadow: var(--shadow);
       backdrop-filter: var(--blur);
-      transition: transform 0.2s, opacity 0.2s;
     }
     .row {
       display: flex;
@@ -152,10 +151,11 @@
     }
     .bar-fill {
       width: 100%;
-      background: linear-gradient(to top, var(--accent), #5ac8fa);
       transition: height 0.5s ease;
       border-radius: 10px 10px 0 0;
     }
+    #miskaBar { background: linear-gradient(to top, #34c759, #30d158); }
+    #bakBar { background: linear-gradient(to top, var(--accent), #5ac8fa); }
     .tab-bar {
       position: fixed;
       bottom: 0; left: 0; right: 0;
@@ -204,7 +204,13 @@
     }
     .chip.selected { background: var(--accent); color: white; }
     ul { list-style: none; padding: 0; }
-    li { padding: 8px 0; border-bottom: 0.5px solid var(--bar-bg); display: flex; justify-content: space-between; align-items: center; }
+    li {
+      padding: 8px 0;
+      border-bottom: 0.5px solid var(--bar-bg);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     .notification-banner {
       position: fixed;
       top: 10px;
@@ -222,12 +228,7 @@
       text-align: center;
     }
     .notification-banner.show { transform: translateY(0); }
-    .filter-bar {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .filter-btn {
       padding: 6px 14px;
       border-radius: 16px;
@@ -238,14 +239,12 @@
       cursor: pointer;
     }
     .filter-btn.active { background: var(--accent); color: white; }
-    .lock-icon { font-size: 14px; margin-left: 4px; }
-    #login { transition: opacity 0.3s; }
   </style>
 </head>
 <body>
 <div class="notification-banner" id="banner"></div>
 
-<!-- Экран входа (полная блокировка действий, но статус виден) -->
+<!-- Экран входа -->
 <div id="login" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px; background:var(--bg);">
   <h2>🐱 Кормушка</h2>
   <p style="color:var(--secondary); margin:12px 0; text-align:center;">Для просмотра статуса нажмите «Продолжить без пароля».<br>Для управления войдите.</p>
@@ -269,18 +268,14 @@
     <div class="card">
       <div class="row"><span class="label">🥣 Миска</span><span class="value" id="miskaVal">-- см</span></div>
       <div style="display:flex; align-items:center; margin-top:12px;">
-        <div class="bar-container">
-          <div class="bar-fill" id="miskaBar" style="height:0%; background: linear-gradient(to top, #34c759, #30d158);"></div>
-        </div>
+        <div class="bar-container"><div class="bar-fill" id="miskaBar" style="height:0%;"></div></div>
         <span id="miskaPct" style="font-size:16px; font-weight:500; color:var(--secondary);">0%</span>
       </div>
     </div>
     <div class="card">
       <div class="row"><span class="label">🛢️ Бак</span><span class="value" id="bakVal">-- см</span></div>
       <div style="display:flex; align-items:center; margin-top:12px;">
-        <div class="bar-container">
-          <div class="bar-fill" id="bakBar" style="height:0%"></div>
-        </div>
+        <div class="bar-container"><div class="bar-fill" id="bakBar" style="height:0%;"></div></div>
         <span id="bakPct" style="font-size:16px; font-weight:500; color:var(--secondary);">0%</span>
       </div>
     </div>
@@ -304,7 +299,7 @@
         <button class="filter-btn" onclick="filterLog('smart', this)">Умные</button>
         <button class="filter-btn" onclick="filterLog('schedule', this)">Расписание</button>
       </div>
-      <input type="date" id="logDateFilter" class="input" onchange="refreshLog()" placeholder="Фильтр по дате">
+      <input type="date" id="logDateFilter" class="input" onchange="refreshLog()">
       <button class="btn secondary" onclick="refreshLog()">Обновить</button>
       <ul id="logList" style="margin-top:12px;"></ul>
     </div>
@@ -376,12 +371,19 @@
 </div>
 
 <script>
+  // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И УТИЛИТЫ ==========
   const DB = "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app";
   const PASS = '1321';
   let currentUser = null; // 'admin' или 'guest'
   let sensorTimer, logTimer;
+  let selectedDays = new Set();
+  let currentLogFilter = 'all';
 
-  // ----- ИНИЦИАЛИЗАЦИЯ -----
+  // Вспомогательные функции для Firebase
+  const get = (path) => fetch(DB + path + '.json').then(r => r.json());
+  const put = (path, data) => fetch(DB + path + '.json', { method: 'PUT', body: JSON.stringify(data) });
+
+  // ========== АВТОРИЗАЦИЯ ==========
   if (localStorage.getItem('auth') === 'admin') {
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -391,7 +393,7 @@
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     currentUser = 'guest';
-    document.getElementById('feedBtn').style.display = 'none'; // скрыть кнопку кормления
+    document.getElementById('feedBtn').style.display = 'none';
     document.getElementById('dndToggle').style.display = 'none';
     initApp();
   }
@@ -402,20 +404,46 @@
       if (pwd === PASS) {
         localStorage.setItem('auth', 'admin');
         location.reload();
-      } else {
-        alert('Неверный пароль');
-      }
+      } else alert('Неверный пароль');
     } else {
       localStorage.setItem('auth', 'guest');
       location.reload();
     }
   };
 
-  // ----- УТИЛИТЫ -----
-  const get = (path) => fetch(DB + path + '.json').then(r => r.json());
-  const put = (path, data) => fetch(DB + path + '.json', { method: 'PUT', body: JSON.stringify(data) });
+  // ========== ОСНОВНЫЕ ФУНКЦИИ ==========
+  function initApp() {
+    setupTabs();
+    setupDaysChips();
+    refreshSensors();
+    refreshLog();
+    renderSchedule();
+    checkLowFood();
+    sensorTimer = setInterval(refreshSensors, 3000);
+    logTimer = setInterval(refreshLog, 15000);
+    setInterval(checkLowFood, 10000);
+    if (Notification.permission === 'default') Notification.requestPermission();
+    // Инициализация кнопки DND
+    get('/schedule_paused').then(paused => {
+      const btn = document.getElementById('dndToggle');
+      if (btn) btn.textContent = paused ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
+    });
+  }
 
-  // ----- ГЛАВНЫЙ ЭКРАН -----
+  // Табы
+  function setupTabs() {
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+        document.getElementById(target).classList.add('active');
+      });
+    });
+  }
+
+  // Датчики
   async function refreshSensors() {
     try {
       const sensors = await get('/sensors');
@@ -425,12 +453,11 @@
         updateBar('miska', sensors.miska);
         updateBar('bak', sensors.bak);
         setOnline(true);
-        // Wi-Fi RSSI (заглушка)
-        const rssi = await get('/wifi_rssi');
-        if (rssi) document.getElementById('wifiStrength').textContent = rssi + ' dBm';
       } else {
         setOnline(false);
       }
+      const rssi = await get('/wifi_rssi');
+      if (rssi !== null) document.getElementById('wifiStrength').textContent = rssi + ' dBm';
     } catch (e) { setOnline(false); }
   }
 
@@ -452,14 +479,12 @@
 
   function setOnline(online) {
     const conn = document.getElementById('conn');
-    if (online) {
-      conn.innerHTML = '<span class="status-dot" style="background:var(--green)"></span> Онлайн';
-    } else {
-      conn.innerHTML = '<span class="status-dot" style="background:var(--red)"></span> Офлайн';
-    }
+    conn.innerHTML = online ?
+      '<span class="status-dot" style="background:var(--green)"></span> Онлайн' :
+      '<span class="status-dot" style="background:var(--red)"></span> Офлайн';
   }
 
-  // ----- КОРМЛЕНИЕ -----
+  // Кормление
   window.feed = async () => {
     if (currentUser !== 'admin') return alert('Требуется авторизация');
     await put('/feed_command', true);
@@ -475,7 +500,7 @@
     showBanner('Отложенное кормление запланировано');
   };
 
-  // ----- РЕЖИМ "НЕ БЕСПОКОИТЬ" -----
+  // Не беспокоить
   window.toggleDND = async () => {
     if (currentUser !== 'admin') return alert('Требуется авторизация');
     const current = await get('/schedule_paused');
@@ -486,10 +511,9 @@
     showBanner(newState ? 'Режим «Не беспокоить» активирован' : 'Режим «Не беспокоить» выключен');
   };
 
-  // ----- ЛОГ -----
-  let currentFilter = 'all';
+  // Лог
   window.filterLog = (type, btn) => {
-    currentFilter = type;
+    currentLogFilter = type;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     refreshLog();
@@ -507,8 +531,8 @@
         return d.toISOString().slice(0,10) === dateFilter;
       });
     }
-    if (currentFilter !== 'all') {
-      entries = entries.filter(([key, val]) => val.type === currentFilter);
+    if (currentLogFilter !== 'all') {
+      entries = entries.filter(([, val]) => val.type === currentLogFilter);
     }
     entries = entries.slice(0, 50);
     list.innerHTML = entries.map(([key, val]) => {
@@ -518,11 +542,9 @@
       const type = typeMap[val.type] || val.type;
       return `<li><span>${time}</span> <span style="color:var(--secondary);">${type}</span></li>`;
     }).join('');
-    document.getElementById('logList').innerHTML = entries.length ? entries.join('') : '<li>Нет записей</li>';
   }
 
-  // ----- РАСПИСАНИЕ -----
-  let selectedDays = new Set();
+  // Расписание
   function setupDaysChips() {
     document.querySelectorAll('#daysSelect .chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -568,7 +590,7 @@
     renderSchedule();
   };
 
-  // ----- НАСТРОЙКИ -----
+  // Настройки
   window.calibrate = (sensor, type) => {
     if (currentUser !== 'admin') return alert('Требуется авторизация');
     put('/calibrate', { sensor, type });
@@ -593,7 +615,7 @@
     location.reload();
   };
 
-  // ----- УВЕДОМЛЕНИЯ -----
+  // Уведомления
   function showBanner(msg) {
     const banner = document.getElementById('banner');
     banner.textContent = msg;
@@ -601,7 +623,6 @@
     setTimeout(() => banner.classList.remove('show'), 3000);
   }
 
-  // Push-уведомления о низком корме
   async function checkLowFood() {
     const alert = await get('/low_food_alert');
     if (alert === true) {
@@ -611,41 +632,6 @@
       }
     }
   }
-
-  // ----- ТАБЫ -----
-  function setupTabs() {
-    document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const target = tab.dataset.tab;
-        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-        document.getElementById(target).classList.add('active');
-      });
-    });
-  }
-
-  // ----- ЗАПУСК -----
-  function initApp() {
-    setupTabs();
-    setupDaysChips();
-    refreshSensors();
-    refreshLog();
-    renderSchedule();
-    checkLowFood();
-    sensorTimer = setInterval(refreshSensors, 3000);
-    logTimer = setInterval(refreshLog, 15000);
-    setInterval(checkLowFood, 10000);
-    // Запрос уведомлений
-    if (Notification.permission === 'default') Notification.requestPermission();
-    // Проверка режима "Не беспокоить"
-    get('/schedule_paused').then(paused => {
-      const btn = document.getElementById('dndToggle');
-      if (btn) btn.textContent = paused ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
-    });
-  }
-
-  // Инициализация при загрузке для гостя/админа (уже вызвана выше)
 </script>
 </body>
 </html>
