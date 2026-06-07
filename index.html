@@ -482,12 +482,14 @@ const firebaseConfig = {
     setTimeout(() => banner.classList.remove('show'), duration);
   }
 
-  async function isAdminUser() {
-    const user = auth.currentUser;
-    if (!user) return false;
-    const token = await user.getIdTokenResult();
-    return token.claims.admin === true;
-  }
+async function isAdminUser() {
+  const user = auth.currentUser;
+  if (!user) return false;
+  // Замените 'ВАШ_UID' на реальный UID (можно найти в консоли Firebase → Authentication → Users)
+  if (user.uid === 'ВАШ_UID') return true;
+  const token = await user.getIdTokenResult();
+  return token.claims.admin === true;
+}
 
   // ========== АВТОРИЗАЦИЯ ==========
   window.loginAdmin = async () => {
