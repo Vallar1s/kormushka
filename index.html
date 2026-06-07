@@ -7,8 +7,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-  <title>🐱 Кормушка (Автономная версия с анимациями)</title>
+  <title>🐱 Кормушка (Firebase + Анимации)</title>
   <style>
+    /* ======== ВСЕ СТИЛИ И АНИМАЦИИ (без изменений) ======== */
     :root {
       --bg: #f2f2f7;
       --card-bg: rgba(255,255,255,0.75);
@@ -71,6 +72,17 @@
       opacity: 1;
       transform: translateY(0);
     }
+    #login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      padding: 20px;
+      background: var(--bg);
+    }
+    #login-screen.hidden { display: none; }
+    #app-screen.hidden { display: none; }
     .card {
       background: var(--card-bg);
       border-radius: var(--radius);
@@ -122,7 +134,6 @@
       position: relative;
       overflow: hidden;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
-      --ripple-opacity: 0;
     }
     .btn::after {
       content: '';
@@ -133,12 +144,12 @@
       background: rgba(255,255,255,0.3);
       transform: translate(-50%, -50%);
       transition: width 0.6s ease, height 0.6s ease, opacity 0.4s;
-      opacity: var(--ripple-opacity);
+      opacity: 0;
     }
     .btn:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(0,122,255,0.2); }
     .btn:active::after {
       width: 300px; height: 300px;
-      --ripple-opacity: 1;
+      opacity: 1;
     }
     .btn:focus-visible {
       box-shadow: 0 0 0 3px rgba(0,122,255,0.5);
@@ -202,9 +213,7 @@
     .tab svg { width: 24px; height: 24px; margin-bottom: 2px; fill: currentColor; transition: transform 0.2s; }
     .tab:active svg { transform: scale(0.9); }
     .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    input, select, button {
-      font-family: inherit;
-    }
+    input, select, button { font-family: inherit; }
     .input, select {
       width: 100%;
       padding: 12px 16px;
@@ -283,8 +292,8 @@
     .filter-btn.active { background: var(--accent); color: white; }
     .hidden { display: none !important; }
     .text-center { text-align: center; }
+    .error-message { color: var(--red); margin-top: 8px; }
 
-    /* Анимации */
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(30px); }
       to { opacity: 1; transform: translateY(0); }
@@ -313,27 +322,28 @@
 <div class="notification-banner" id="banner" role="status" aria-live="polite"></div>
 
 <!-- Экран входа -->
-<div id="login" class="content" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px; background:var(--bg);">
+<div id="login-screen">
   <h2 class="spring" style="margin-bottom:12px;">🐱 Кормушка</h2>
-  <p style="color:var(--secondary); margin-bottom:24px; text-align:center;">Демо-режим без подключения к сети.<br>Для управления введите пароль администратора.</p>
-  <div id="loginForm" style="width:100%; max-width:300px;">
-    <input type="password" id="passInput" class="input" placeholder="Пароль (по умолчанию admin)">
-    <button class="btn" onclick="handleLogin(true)" style="margin-top:12px;">Войти как администратор</button>
-    <p id="loginError" class="error-message hidden" style="color:var(--red); margin-top:8px;">Неверный пароль</p>
+  <p style="color:var(--secondary); margin-bottom:24px; text-align:center;">Для просмотра статуса войдите как гость.<br>Для управления войдите как администратор.</p>
+  <div style="width:100%; max-width:300px;">
+    <input type="email" id="emailInput" class="input" placeholder="Email администратора">
+    <input type="password" id="passInput" class="input" placeholder="Пароль">
+    <button class="btn" onclick="loginAdmin()" style="margin-top:12px;">Войти как администратор</button>
+    <p id="loginError" class="error-message hidden">Неверный email или пароль</p>
   </div>
-  <button class="btn secondary" style="max-width:260px; margin-top:20px;" onclick="handleLogin(false)">Войти как гость</button>
+  <button class="btn secondary" style="max-width:260px; margin-top:20px;" onclick="loginGuest()">Войти как гость</button>
 </div>
 
-<div id="app" class="hidden">
-  <div class="header">🐱 Кормушка (Демо)</div>
+<!-- Основной экран -->
+<div id="app-screen" class="hidden">
+  <div class="header">🐱 Кормушка</div>
   
-  <!-- Главная -->
   <div id="dash" class="content active" role="tabpanel">
     <div class="card" style="display:flex; align-items:center; gap:12px;">
-      <span style="font-size:28px;" aria-hidden="true">📶</span>
+      <span style="font-size:28px;">📶</span>
       <div>
-        <div class="row"><span class="label">Статус</span><span id="conn"><span class="status-dot" style="background:var(--green)"></span> Локальный режим</span></div>
-        <div id="wifiStrength" style="font-size:12px; color:var(--secondary);">Нет данных</div>
+        <div class="row"><span class="label">Статус</span><span id="conn"><span class="status-dot" style="background:var(--red)"></span> Офлайн</span></div>
+        <div id="wifiStrength" style="font-size:12px; color:var(--secondary);">-- dBm</div>
       </div>
     </div>
     <div class="card">
@@ -354,18 +364,17 @@
         <span id="bakPct" style="font-size:16px; font-weight:500; color:var(--secondary);">0%</span>
       </div>
     </div>
-    <div id="adminControls" class="card">
-      <button class="btn" onclick="demoFeeding()">🥣 Покормить сейчас</button>
+    <div id="adminControls" class="card hidden">
+      <button class="btn" onclick="feedNow()">🥣 Покормить сейчас</button>
       <div style="margin:12px 0; display:flex; gap:8px;">
         <input type="number" id="delayH" placeholder="Часы" class="input" style="flex:1" min="0" max="23" value="0">
         <input type="number" id="delayM" placeholder="Минуты" class="input" style="flex:1" min="0" max="59" value="0">
-        <button class="btn secondary" style="flex:1; margin-top:0;" onclick="demoFeedLater()">⏳ Отложить</button>
+        <button class="btn secondary" style="flex:1; margin-top:0;" onclick="feedLater()">⏳ Отложить</button>
       </div>
       <button class="btn secondary" id="dndToggle" onclick="toggleDND()">🔕 Включить «Не беспокоить»</button>
     </div>
   </div>
 
-  <!-- Лог -->
   <div id="log" class="content" role="tabpanel">
     <div class="card">
       <h3 style="margin-bottom:12px;">📋 История кормлений</h3>
@@ -374,13 +383,12 @@
         <button class="filter-btn" onclick="historyLog.setFilter('manual', this)">Ручные</button>
         <button class="filter-btn" onclick="historyLog.setFilter('schedule', this)">Расписание</button>
       </div>
-      <input type="date" id="logDateFilter" class="input" onchange="historyLog.refresh()" max="">
+      <input type="date" id="logDateFilter" class="input" onchange="historyLog.refresh()">
       <button class="btn secondary" onclick="historyLog.refresh()">🔄 Обновить</button>
       <ul id="logList" style="margin-top:12px;"></ul>
     </div>
   </div>
 
-  <!-- Расписание -->
   <div id="schedule" class="content" role="tabpanel">
     <div class="card">
       <h3 style="margin-bottom:12px;">⏰ Расписание кормлений</h3>
@@ -396,7 +404,6 @@
     </div>
   </div>
 
-  <!-- Настройки -->
   <div id="settings" class="content" role="tabpanel">
     <div class="card">
       <div class="label">Время открытия заслонки (мс)</div>
@@ -413,18 +420,12 @@
       <button class="btn secondary" onclick="calibrate('bak','empty')">Запомнить как пустой</button>
       <button class="btn secondary" onclick="calibrate('bak','full')">Запомнить как полный</button>
     </div>
-    <div class="card">
-      <div class="label">Сменить пароль администратора</div>
-      <input type="password" id="newPass" class="input" placeholder="Новый пароль">
-      <button class="btn secondary" onclick="changePassword()">Сохранить</button>
-    </div>
     <div class="card text-center">
-      <p style="color:var(--secondary); font-size:13px;">Автономная демо-версия 3.0 • Анимации ✨</p>
+      <p style="color:var(--secondary); font-size:13px;">Версия Firebase • Анимации ✨</p>
     </div>
     <button class="btn secondary" style="margin-top:20px;" onclick="logout()">Выйти</button>
   </div>
 
-  <!-- Таб-бар -->
   <div class="tab-bar" role="tablist">
     <div class="tab active" data-tab="dash" tabindex="0">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
@@ -445,81 +446,166 @@
   </div>
 </div>
 
-<script>
-  // ========== ЛОКАЛЬНОЕ ХРАНИЛИЩЕ И УТИЛИТЫ ==========
-  const STORAGE_KEY = 'kormushka_demo';
-  const DEFAULT_ADMIN_PASS = 'admin';
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import { getAuth, signInWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+  import { getDatabase, ref, get as dbGet, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-  function loadData() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } 
-    catch { return {}; }
+  // ⚠️ ЗАМЕНИТЕ НА КОНФИГУРАЦИЮ ВАШЕГО ПРОЕКТА
+  const firebaseConfig = {
+    apiKey: "AIzaSyDummyKeyForDemo",
+    authDomain: "your-project.firebaseapp.com",
+    databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+    projectId: "your-project",
+    storageBucket: "your-project.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+
+  // ========== УТИЛИТЫ ==========
+  function sanitizeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
-  function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
-  function initStore() {
-    let data = loadData();
-    if (!data.calibration) data.calibration = { miska: { empty: 15, full: 3 }, bak: { empty: 35, full: 5 } };
-    if (!data.sensors) data.sensors = { miska: 10, bak: 20, wifi: -50 };
-    if (!data.schedule) data.schedule = [];
-    if (!data.logs) data.logs = {};
-    if (!data.dnd) data.dnd = false;
-    if (!data.portion) data.portion = 500;
-    if (!data.adminPass) data.adminPass = DEFAULT_ADMIN_PASS;
-    saveData(data);
-    return data;
+  function showBanner(msg, duration = 3000) {
+    const banner = document.getElementById('banner');
+    banner.textContent = msg;
+    banner.classList.add('show');
+    setTimeout(() => banner.classList.remove('show'), duration);
   }
 
-  let store = initStore();
-  let currentUser = null;
-  let selectedDays = new Set();
-  let currentLogFilter = 'all';
+  async function isAdminUser() {
+    const user = auth.currentUser;
+    if (!user) return false;
+    const token = await user.getIdTokenResult();
+    return token.claims.admin === true;
+  }
 
   // ========== АВТОРИЗАЦИЯ ==========
-  window.handleLogin = (asAdmin) => {
-    if (asAdmin) {
-      const pass = document.getElementById('passInput').value;
-      if (pass === store.adminPass) {
-        currentUser = 'admin';
-        showApp();
+  window.loginAdmin = async () => {
+    const email = document.getElementById('emailInput').value;
+    const pass = document.getElementById('passInput').value;
+    const errEl = document.getElementById('loginError');
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      errEl.classList.add('hidden');
+      // при успешном входе onAuthStateChanged сам покажет приложение
+    } catch (e) {
+      errEl.textContent = 'Неверный email или пароль';
+      errEl.classList.remove('hidden');
+    }
+  };
+
+  window.loginGuest = () => signInAnonymously(auth);
+
+  window.logout = () => signOut(auth);
+
+  // ========== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ПО АУТЕНТИФИКАЦИИ ==========
+  let appInitialized = false;
+  let unsubscribes = [];
+
+  onAuthStateChanged(auth, async (user) => {
+    const loginScreen = document.getElementById('login-screen');
+    const appScreen = document.getElementById('app-screen');
+    if (user) {
+      loginScreen.classList.add('hidden');
+      appScreen.classList.remove('hidden');
+      // Определить админа
+      const admin = user.isAnonymous ? false : await isAdminUser();
+      const adminControls = document.getElementById('adminControls');
+      if (admin) {
+        adminControls.classList.remove('hidden');
       } else {
-        document.getElementById('loginError').classList.remove('hidden');
-        return;
+        adminControls.classList.add('hidden');
+      }
+      if (!appInitialized) {
+        initApp(admin);
+        appInitialized = true;
       }
     } else {
-      currentUser = 'guest';
-      showApp();
+      // Выход
+      loginScreen.classList.remove('hidden');
+      appScreen.classList.add('hidden');
+      if (appInitialized) {
+        // Отписаться от всех слушателей Firebase
+        unsubscribes.forEach(fn => fn());
+        unsubscribes = [];
+        appInitialized = false;
+      }
     }
-  };
+  });
 
-  function showApp() {
-    document.getElementById('login').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
-    if (currentUser !== 'admin') {
-      document.getElementById('adminControls').classList.add('hidden');
-    }
-    initApp();
-  }
-
-  window.logout = () => {
-    currentUser = null;
-    document.getElementById('login').classList.remove('hidden');
-    document.getElementById('app').classList.add('hidden');
-  };
-
-  // ========== ИНИЦИАЛИЗАЦИЯ ==========
-  function initApp() {
+  // ========== ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ==========
+  function initApp(isAdmin) {
     setupTabs();
     setupDaysChips();
-    updateSensorsUI();
-    renderSchedule();
-    renderLog();
-    setInterval(() => {
-      store.sensors.miska = Math.max(1, store.sensors.miska + (Math.random() - 0.5) * 2);
-      store.sensors.bak = Math.max(1, store.sensors.bak + (Math.random() - 0.5) * 2);
-      store.sensors.wifi = Math.floor(-40 + Math.random() * 20);
-      saveData(store);
-      updateSensorsUI();
-    }, 3000);
+    
+    // Подписка на датчики
+    const sensorsRef = ref(db, 'sensors');
+    const unsubSensors = onValue(sensorsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        updateSensorUI(data);
+        setOnline(true);
+      } else {
+        setOnline(false);
+      }
+    });
+    unsubscribes.push(unsubSensors);
+
+    // WiFi RSSI
+    const rssiRef = ref(db, 'wifi_rssi');
+    const unsubRssi = onValue(rssiRef, (snapshot) => {
+      document.getElementById('wifiStrength').textContent = snapshot.val() !== null ? `${snapshot.val()} dBm` : '-- dBm';
+    });
+    unsubscribes.push(unsubRssi);
+
+    // Логи
+    const logsRef = ref(db, 'logs');
+    const unsubLogs = onValue(logsRef, (snapshot) => {
+      historyLog.processData(snapshot.val());
+    });
+    unsubscribes.push(unsubLogs);
+
+    // Расписание
+    const scheduleRef = ref(db, 'schedule');
+    const unsubSchedule = onValue(scheduleRef, (snapshot) => {
+      renderSchedule(snapshot.val() || []);
+    });
+    unsubscribes.push(unsubSchedule);
+
+    // DND
+    const dndRef = ref(db, 'schedule_paused');
+    const unsubDnd = onValue(dndRef, (snapshot) => {
+      const paused = snapshot.val();
+      const btn = document.getElementById('dndToggle');
+      btn.textContent = paused ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
+    });
+    unsubscribes.push(unsubDnd);
+
+    // Калибровка из базы
+    loadCalibration();
+
+    // Проверка низкого уровня корма
+    const checkFoodTimer = setInterval(async () => {
+      try {
+        const snap = await dbGet(ref(db, 'low_food_alert'));
+        if (snap.val() === true) {
+          showBanner('⚠️ В баке заканчивается корм!');
+          if (Notification.permission === 'granted') {
+            new Notification('🐱 Кормушка', { body: 'В баке заканчивается корм!', icon: '/icon-192.png' });
+          }
+        }
+      } catch {}
+    }, 10000);
+    unsubscribes.push(() => clearInterval(checkFoodTimer));
   }
 
   // ========== ТАБЫ ==========
@@ -528,31 +614,32 @@
       tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
   }
-
-  function switchTab(targetId) {
+  function switchTab(id) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-    const targetTab = document.querySelector(`.tab[data-tab="${targetId}"]`);
-    const targetContent = document.getElementById(targetId);
-    if (targetTab && targetContent) {
-      targetTab.classList.add('active');
-      targetContent.classList.add('active');
-    }
+    const tab = document.querySelector(`.tab[data-tab="${id}"]`);
+    const content = document.getElementById(id);
+    if (tab && content) { tab.classList.add('active'); content.classList.add('active'); }
   }
 
   // ========== ДАТЧИКИ ==========
-  function updateSensorsUI() {
-    document.getElementById('miskaVal').textContent = store.sensors.miska.toFixed(1) + ' см';
-    document.getElementById('bakVal').textContent = store.sensors.bak.toFixed(1) + ' см';
-    document.getElementById('wifiStrength').textContent = store.sensors.wifi + ' dBm';
-    updateBar('miska', store.sensors.miska);
-    updateBar('bak', store.sensors.bak);
+  function updateSensorUI(s) {
+    document.getElementById('miskaVal').textContent = s.miska != null ? `${s.miska} см` : '-- см';
+    document.getElementById('bakVal').textContent = s.bak != null ? `${s.bak} см` : '-- см';
+    updateBar('miska', s.miska);
+    updateBar('bak', s.bak);
+  }
+
+  let calibration = { miska: {}, bak: {} };
+  async function loadCalibration() {
+    const snap = await dbGet(ref(db, 'calibration'));
+    if (snap.val()) calibration = snap.val();
   }
 
   function updateBar(type, dist) {
-    const cal = store.calibration[type];
-    const bar = document.getElementById(type + 'Bar');
-    const pctEl = document.getElementById(type + 'Pct');
+    const cal = calibration[type];
+    const bar = document.getElementById(type+'Bar');
+    const pctEl = document.getElementById(type+'Pct');
     const barContainer = bar.parentElement;
     if (cal && cal.empty != null && cal.full != null && dist != null && cal.full < cal.empty) {
       let pct = ((cal.empty - dist) / (cal.empty - cal.full)) * 100;
@@ -566,28 +653,30 @@
     }
   }
 
-  // ========== КОРМЛЕНИЕ ==========
-  function logEvent(type) {
-    const now = Date.now();
-    store.logs[Math.floor(now / 1000)] = { type, time: now };
-    saveData(store);
-    renderLog();
+  function setOnline(online) {
+    document.getElementById('conn').innerHTML = online ?
+      '<span class="status-dot" style="background:var(--green)"></span> Онлайн' :
+      '<span class="status-dot" style="background:var(--red)"></span> Офлайн';
   }
 
-  window.demoFeeding = () => {
-    logEvent('manual');
-    showBanner('✅ Кормление выполнено (демо)');
-  };
+  // ========== КОРМЛЕНИЕ ==========
+  async function requireAdmin() {
+    if (!(await isAdminUser())) { showBanner('Требуются права администратора'); return false; }
+    return true;
+  }
 
-  window.demoFeedLater = () => {
+  window.feedNow = async () => { if (await requireAdmin()) { await set(ref(db, 'feed_command'), true); showBanner('Команда отправлена'); } };
+  window.feedLater = async () => {
+    if (!(await requireAdmin())) return;
     const h = parseInt(document.getElementById('delayH').value) || 0;
     const m = parseInt(document.getElementById('delayM').value) || 0;
     if (h === 0 && m === 0) return showBanner('Введите время');
-    logEvent('schedule');
-    showBanner(`⏳ Отложенное кормление через ${h}ч ${m}мин (имитация)`);
+    await set(ref(db, 'feed_later'), { hours: h, minutes: m });
+    showBanner('Отложенное кормление запланировано');
   };
 
   // ========== РАСПИСАНИЕ ==========
+  const selectedDays = new Set();
   function setupDaysChips() {
     document.querySelectorAll('#daysSelect .chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -599,121 +688,96 @@
     });
   }
 
-  window.addSchedule = () => {
-    if (currentUser !== 'admin') return showBanner('Требуются права администратора');
+  window.addSchedule = async () => {
+    if (!(await requireAdmin())) return;
     const time = document.getElementById('timeInput').value;
     if (!time) return showBanner('Введите время');
     const [h, m] = time.split(':').map(Number);
     const days = Array.from(selectedDays).map(Number);
     if (days.length === 0) return showBanner('Выберите дни');
-    store.schedule.push({ days, hour: h, minute: m, active: true });
-    saveData(store);
+    const snap = await dbGet(ref(db, 'schedule'));
+    const sched = snap.val() || [];
+    sched.push({ days, hour: h, minute: m, active: true });
+    await set(ref(db, 'schedule'), sched);
     selectedDays.clear();
     document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
-    renderSchedule();
     showBanner('Расписание обновлено');
   };
 
-  window.deleteSchedule = (idx) => {
-    if (currentUser !== 'admin') return showBanner('Требуются права администратора');
-    store.schedule.splice(idx, 1);
-    saveData(store);
-    renderSchedule();
+  window.deleteSchedule = async (idx) => {
+    if (!(await requireAdmin())) return;
+    const snap = await dbGet(ref(db, 'schedule'));
+    const sched = snap.val() || [];
+    sched.splice(idx, 1);
+    await set(ref(db, 'schedule'), sched);
   };
 
-  function renderSchedule() {
-    const list = document.getElementById('scheduleList');
-    list.innerHTML = store.schedule.map((item, idx) => {
+  function renderSchedule(scheduleArray) {
+    document.getElementById('scheduleList').innerHTML = scheduleArray.map((item, idx) => {
       const daysStr = item.days.map(d => ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d]).join(', ');
       const timeStr = `${item.hour}:${String(item.minute).padStart(2,'0')}`;
-      return `<li>${daysStr} в ${timeStr} 
-        <button onclick="deleteSchedule(${idx})" style="margin-left:10px; background:var(--red); color:white; border:none; border-radius:8px; padding:4px 10px;">Удалить</button></li>`;
+      return `<li>${daysStr} в ${timeStr} <button onclick="deleteSchedule(${idx})" style="margin-left:10px; background:var(--red); color:white; border:none; border-radius:8px; padding:4px 10px;">Удалить</button></li>`;
     }).join('');
   }
 
   // ========== DND ==========
-  window.toggleDND = () => {
-    if (currentUser !== 'admin') return showBanner('Требуются права администратора');
-    store.dnd = !store.dnd;
-    saveData(store);
-    const btn = document.getElementById('dndToggle');
-    btn.textContent = store.dnd ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
-    showBanner(store.dnd ? 'Режим «Не беспокоить» активирован' : 'Режим «Не беспокоить» выключен');
+  window.toggleDND = async () => {
+    if (!(await requireAdmin())) return;
+    const snap = await dbGet(ref(db, 'schedule_paused'));
+    const newState = !snap.val();
+    await set(ref(db, 'schedule_paused'), newState);
+    showBanner(newState ? 'Режим «Не беспокоить» активирован' : 'Режим «Не беспокоить» выключен');
   };
 
   // ========== ЛОГ ==========
-  window.historyLog = {
+  const historyLog = {
+    filter: 'all',
     setFilter(type, btn) {
-      currentLogFilter = type;
+      this.filter = type;
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderLog();
+      this.refresh();
     },
-    refresh() { renderLog(); },
+    processData(logs) { this.render(logs); },
+    refresh() { dbGet(ref(db, 'logs')).then(snap => this.render(snap.val())).catch(console.error); },
+    render(logs) {
+      const list = document.getElementById('logList');
+      if (!logs) { list.innerHTML = '<li>Нет записей</li>'; return; }
+      const dateFilter = document.getElementById('logDateFilter').value;
+      let entries = Object.entries(logs).sort((a,b) => b[0].localeCompare(a[0]));
+      if (dateFilter) {
+        entries = entries.filter(([key]) => {
+          const d = new Date(Number(key)*1000);
+          return d.toISOString().slice(0,10) === dateFilter;
+        });
+      }
+      if (this.filter !== 'all') {
+        entries = entries.filter(([, val]) => val.type === this.filter);
+      }
+      entries = entries.slice(0, 50);
+      list.innerHTML = entries.map(([key, val]) => {
+        const d = new Date(Number(key)*1000);
+        const time = d.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+        const typeMap = { manual: 'Вручную', smart: 'Умное', schedule: 'Расписание' };
+        const type = typeMap[val.type] || sanitizeHTML(val.type);
+        return `<li><span>${time}</span> <span style="color:var(--secondary);">${type}</span></li>`;
+      }).join('');
+    }
   };
-
-  function renderLog() {
-    const list = document.getElementById('logList');
-    if (Object.keys(store.logs).length === 0) {
-      list.innerHTML = '<li>Нет записей</li>'; return;
-    }
-    const dateFilter = document.getElementById('logDateFilter').value;
-    let entries = Object.entries(store.logs).sort((a,b) => b[0].localeCompare(a[0]));
-    if (dateFilter) {
-      entries = entries.filter(([key]) => {
-        const d = new Date(parseInt(key) * 1000);
-        return d.toISOString().slice(0,10) === dateFilter;
-      });
-    }
-    if (currentLogFilter !== 'all') {
-      entries = entries.filter(([, val]) => val.type === currentLogFilter);
-    }
-    entries = entries.slice(0, 50);
-    list.innerHTML = entries.map(([key, val]) => {
-      const date = new Date(parseInt(key) * 1000);
-      const time = date.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-      const typeMap = { manual: 'Вручную', schedule: 'Расписание' };
-      const type = typeMap[val.type] || val.type;
-      return `<li><span>${time}</span> <span style="color:var(--secondary);">${type}</span></li>`;
-    }).join('');
-  }
 
   // ========== НАСТРОЙКИ ==========
-  window.calibrate = (sensor, type) => {
-    if (currentUser !== 'admin') return showBanner('Требуются права администратора');
-    const currentDist = store.sensors[sensor];
-    store.calibration[sensor][type] = currentDist;
-    saveData(store);
-    showBanner(`Калибровка ${sensor} (${type}) запомнена: ${currentDist.toFixed(1)} см`);
-    updateSensorsUI();
+  window.calibrate = async (sensor, type) => {
+    if (!(await requireAdmin())) return;
+    await set(ref(db, 'calibrate'), { sensor, type });
+    showBanner(`Запрос калибровки ${sensor} (${type}) отправлен`);
   };
-
-  window.savePortion = () => {
-    if (currentUser !== 'admin') return showBanner('Требуются права администратора');
+  window.savePortion = async () => {
+    if (!(await requireAdmin())) return;
     const val = parseInt(document.getElementById('portionTimeInput').value);
     if (isNaN(val) || val < 100 || val > 5000) return showBanner('Введите корректное значение (100-5000)');
-    store.portion = val;
-    saveData(store);
+    await set(ref(db, 'settings/portion'), val);
     showBanner('Порция сохранена');
   };
-
-  window.changePassword = () => {
-    if (currentUser !== 'admin') return showBanner('Требуются права администратора');
-    const newPass = document.getElementById('newPass').value;
-    if (!newPass) return showBanner('Введите новый пароль');
-    store.adminPass = newPass;
-    saveData(store);
-    showBanner('Пароль изменён');
-  };
-
-  function showBanner(msg) {
-    const banner = document.getElementById('banner');
-    banner.textContent = msg;
-    banner.classList.add('show');
-    setTimeout(() => banner.classList.remove('show'), 3000);
-  }
-
-  document.getElementById('logDateFilter').max = new Date().toISOString().split('T')[0];
 </script>
 </body>
 </html>
