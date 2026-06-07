@@ -51,70 +51,80 @@
   <div class="card" id="lastEvent" style="font-size:14px; color:var(--secondary);">Нет событий</div>
 </div>
 
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-  import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-
-  const firebaseConfig = {
-    databaseURL: "https://kormushka-app-default-rtdb.firebaseio.com/"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
+<script>
+  // Новый региональный URL
+  const DB_URL = "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app";
   const PASSWORD = '1321';
 
   if (localStorage.getItem('auth') === '1') {
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    initApp();
+    startUpdates();
   }
 
-  window.login = function() {
+  function login() {
     if (document.getElementById('pass').value === PASSWORD) {
       localStorage.setItem('auth', '1');
       location.reload();
     } else alert('Неверный пароль');
-  };
+  }
 
-  function initApp() {
-    const miskaRef = ref(db, 'sensors/miska');
-    const bakRef = ref(db, 'sensors/bak');
-    const statusRef = ref(db, 'status');
+  function startUpdates() {
+    setInterval(updateSensors, 2000);
+    updateSensors();
+  }
 
-    onValue(miskaRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val !== null) document.getElementById('miska').textContent = val.toFixed(1) + ' см';
-      document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--green)"></span>';
-    });
-    onValue(bakRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val !== null) {
-        document.getElementById('bak').textContent = val.toFixed(1) + ' см';
-        let empty = parseFloat(localStorage.getItem('bakEmpty') || 35);
-        let full = parseFloat(localStorage.getItem('bakFull') || 5);
-        if (full < empty) {
-          let pct = ((empty - val) / (empty - full)) * 100;
-          pct = Math.max(0, Math.min(100, pct));
-          document.getElementById('bakBar').style.height = pct + '%';
-          document.getElementById('bakPct').textContent = Math.round(pct) + '%';
+  function updateSensors() {
+    fetch(`${DB_URL}/sensors.json`)
+      .then(r => r.json())
+      .then(data => {
+        if (data) {
+          if (data.miska !== undefined) {
+            document.getElementById('miska').textContent = parseFloat(data.miska).toFixed(1) + ' см';
+          }
+          if (data.bak !== undefined) {
+            document.getElementById('bak').textContent = parseFloat(data.bak).toFixed(1) + ' см';
+            let empty = parseFloat(localStorage.getItem('bakEmpty') || 35);
+            let full = parseFloat(localStorage.getItem('bakFull') || 5);
+            if (full < empty) {
+              let pct = ((empty - data.bak) / (empty - full)) * 100;
+              pct = Math.max(0, Math.min(100, pct));
+              document.getElementById('bakBar').style.height = pct + '%';
+              document.getElementById('bakPct').textContent = Math.round(pct) + '%';
+            }
+          }
+          document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--green)"></span>';
+        } else {
+          document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--red)"></span>';
         }
-      }
-    });
-    onValue(statusRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val) document.getElementById('lastEvent').textContent = val;
-    });
+      })
+      .catch(() => {
+        document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--red)"></span>';
+      });
 
-    window.feed = function() {
-      set(ref(db, 'feed_command'), true);
-    };
-    window.feedLater = function() {
-      let h = parseInt(document.getElementById('delayH').value) || 0;
-      let m = parseInt(document.getElementById('delayM').value) || 0;
-      if (h===0 && m===0) return alert('Введите время');
-      set(ref(db, 'feed_later'), { hours: h, minutes: m });
-      alert('Запланировано');
-    };
+    fetch(`${DB_URL}/status.json`)
+      .then(r => r.json())
+      .then(val => {
+        if (val) document.getElementById('lastEvent').textContent = val;
+      });
+  }
+
+  function feed() {
+    fetch(`${DB_URL}/feed_command.json`, {
+      method: 'PUT',
+      body: 'true'
+    });
+  }
+
+  function feedLater() {
+    let h = parseInt(document.getElementById('delayH').value) || 0;
+    let m = parseInt(document.getElementById('delayM').value) || 0;
+    if (h===0 && m===0) return alert('Введите время');
+    fetch(`${DB_URL}/feed_later.json`, {
+      method: 'PUT',
+      body: JSON.stringify({ hours: h, minutes: m })
+    });
+    alert('Запланировано');
   }
 </script>
 </body>
