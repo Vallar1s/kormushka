@@ -453,15 +453,16 @@
   import { getDatabase, ref, get as dbGet, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
   // ⚠️ ЗАМЕНИТЕ НА КОНФИГУРАЦИЮ ВАШЕГО ПРОЕКТА
-  const firebaseConfig = {
-    apiKey: "TIhnzpY2gWUabd1qVW6s54c74nbpPfFLtwSRcAZu",
-    authDomain: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app/",
-    databaseURL: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "kormushka-app",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "414413182022",
-    appId: "1:414413182022:web:ab2133d2ccf624c0eee647"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
+  authDomain: "kormushka-app.firebaseapp.com",
+  databaseURL: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "kormushka-app",
+  storageBucket: "kormushka-app.firebasestorage.app",
+  messagingSenderId: "414413182022",
+  appId: "1:414413182022:web:ab2133d2ccf624c0eee647",
+  measurementId: "G-VCYGYH585G"
+};
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
