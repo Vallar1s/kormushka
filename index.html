@@ -2,130 +2,520 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
   <title>Кормушка</title>
   <style>
-    :root { --bg: #f2f2f7; --card: #fff; --text: #1c1c1e; --secondary: #8e8e93; --accent: #007aff; --red: #ff3b30; --green: #34c759; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #000; --card: #1c1c1e; --text: #fff; --secondary: #98989d; } }
+    :root {
+      --bg: #f2f2f7;
+      --card-bg: #ffffff;
+      --text: #1c1c1e;
+      --secondary: #8e8e93;
+      --accent: #007aff;
+      --red: #ff3b30;
+      --green: #34c759;
+      --bar-bg: #e5e5ea;
+      --shadow: 0 2px 8px rgba(0,0,0,0.08);
+      --radius: 16px;
+      --transition: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1.2);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #000000;
+        --card-bg: #1c1c1e;
+        --text: #ffffff;
+        --secondary: #98989d;
+        --bar-bg: #3a3a3c;
+        --shadow: 0 2px 8px rgba(0,0,0,0.4);
+      }
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 500px; margin: auto; }
-    .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .label { font-size: 15px; color: var(--secondary); text-transform: uppercase; }
-    .value { font-size: 22px; font-weight: 600; }
-    .btn { display: block; width: 100%; padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 14px; font-size: 18px; font-weight: 600; margin-top: 12px; cursor: pointer; }
-    .btn:active { opacity: 0.8; }
-    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-    .input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 10px; font-size: 16px; margin: 8px 0; background: var(--bg); color: var(--text); }
-    .bar-container { width: 30px; height: 100px; background: var(--secondary); border-radius: 6px; overflow: hidden; margin-right: 10px; }
-    .bar-fill { width: 100%; background: var(--accent); transition: height 0.5s; }
-    .flex { display: flex; align-items: center; gap: 12px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: 80px;
+      transition: background var(--transition), color var(--transition);
+    }
+    .header {
+      padding: 16px 20px 8px;
+      font-size: 34px;
+      font-weight: bold;
+      text-align: center;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 16px;
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+    .content.active { display: block; }
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      transition: transform var(--transition), opacity var(--transition);
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .label {
+      font-size: 13px;
+      color: var(--secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .value {
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 18px;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition);
+      margin-top: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      outline: none;
+    }
+    .btn:active { transform: scale(0.96); opacity: 0.9; }
+    .btn.secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1.5px solid var(--accent);
+    }
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .bar-container {
+      width: 40px;
+      height: 120px;
+      background: var(--bar-bg);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-right: 16px;
+    }
+    .bar-fill {
+      width: 100%;
+      background: linear-gradient(to top, var(--accent), #5ac8fa);
+      transition: height 0.5s ease;
+      border-radius: 10px 10px 0 0;
+    }
+    .tab-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 70px;
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      display: flex;
+      border-top: 0.5px solid var(--bar-bg);
+      z-index: 10;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--secondary);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .tab.active { color: var(--accent); }
+    .tab svg { width: 24px; height: 24px; margin-bottom: 2px; fill: currentColor; }
+    .input, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--bar-bg);
+      border-radius: 10px;
+      font-size: 16px;
+      margin: 8px 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .chip {
+      display: inline-block;
+      padding: 6px 14px;
+      margin: 4px;
+      border-radius: 20px;
+      background: var(--bar-bg);
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .chip.selected { background: var(--accent); color: white; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 8px 0; border-bottom: 0.5px solid var(--bar-bg); }
+    .notification-banner {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      background: var(--green);
+      color: white;
+      padding: 12px;
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      z-index: 20;
+      transform: translateY(-120%);
+      transition: transform 0.3s ease;
+      font-size: 14px;
+      text-align: center;
+    }
+    .notification-banner.show { transform: translateY(0); }
   </style>
 </head>
 <body>
-<div id="login" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:90vh;">
+<div class="notification-banner" id="banner"></div>
+
+<div id="login" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px;">
   <h2>🐱 Кормушка</h2>
   <input type="password" id="pass" class="input" placeholder="Пароль" style="max-width:260px">
   <button class="btn" style="max-width:260px" onclick="login()">Войти</button>
 </div>
 
 <div id="app" style="display:none;">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <h2>🐱 Кормушка</h2>
-    <span id="conn">🟡</span>
-  </div>
-  <div class="card">
-    <div class="row"><span class="label">Миска</span><span class="value" id="miska">-- см</span></div>
-    <div class="row"><span class="label">Бак</span><span class="value" id="bak">-- см</span></div>
-    <div class="flex" style="margin-top:8px;">
-      <div class="bar-container"><div class="bar-fill" id="bakBar" style="height:0%"></div></div>
-      <span id="bakPct">0%</span>
+  <div class="header">🐱 Кормушка</div>
+  
+  <!-- Главная -->
+  <div id="dash" class="content active">
+    <div class="card">
+      <div class="row">
+        <span class="label">Статус</span>
+        <span id="conn"><span class="status-dot" style="background:var(--red)"></span> Офлайн</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row"><span class="label">Миска</span><span class="value" id="miskaVal">--</span></div>
+      <div class="row"><span class="label">Бак</span><span class="value" id="bakVal">--</span></div>
+      <div style="display:flex; align-items:center; margin-top:12px;">
+        <div class="bar-container">
+          <div class="bar-fill" id="bakBar" style="height:0%"></div>
+        </div>
+        <span id="bakPct" style="font-size:20px; font-weight:600;">0%</span>
+      </div>
+    </div>
+    <div class="card" id="lastEvent" style="font-size:14px; color:var(--secondary);">Нет событий</div>
+    <button class="btn" onclick="feed()">🥣 Покормить сейчас</button>
+    <div style="margin:12px 0; display:flex; gap:8px;">
+      <input type="number" id="delayH" placeholder="Часы" class="input" style="flex:1">
+      <input type="number" id="delayM" placeholder="Минуты" class="input" style="flex:1">
+      <button class="btn secondary" style="flex:1; margin-top:0;" onclick="feedLater()">⏳ Отложить</button>
     </div>
   </div>
-  <button class="btn" onclick="feed()">🥣 Покормить сейчас</button>
-  <div style="display:flex; gap:8px; margin:12px 0;">
-    <input type="number" id="delayH" placeholder="Часы" class="input" style="flex:1;">
-    <input type="number" id="delayM" placeholder="Минуты" class="input" style="flex:1;">
-    <button class="btn" style="margin-top:0; flex:1;" onclick="feedLater()">⏳ Отложить</button>
+
+  <!-- Лог -->
+  <div id="log" class="content">
+    <div class="card">
+      <h3 style="margin-bottom:12px;">Последние кормления</h3>
+      <button class="btn secondary" onclick="loadLogs()">Обновить</button>
+      <ul id="logList"></ul>
+    </div>
   </div>
-  <div class="card" id="lastEvent" style="font-size:14px; color:var(--secondary);">Нет событий</div>
+
+  <!-- Расписание -->
+  <div id="schedule" class="content">
+    <div class="card">
+      <h3 style="margin-bottom:12px;">Расписание</h3>
+      <div id="daysSelect" style="margin-bottom:12px;">
+        <span class="chip" data-day="1">Пн</span><span class="chip" data-day="2">Вт</span><span class="chip" data-day="3">Ср</span>
+        <span class="chip" data-day="4">Чт</span><span class="chip" data-day="5">Пт</span><span class="chip" data-day="6">Сб</span><span class="chip" data-day="0">Вс</span>
+      </div>
+      <input type="time" id="timeInput" class="input" value="09:00">
+      <button class="btn" onclick="addSchedule()">Добавить</button>
+      <ul id="scheduleList" style="margin-top:12px;"></ul>
+    </div>
+  </div>
+
+  <!-- Настройки -->
+  <div id="settings" class="content">
+    <div class="card">
+      <div class="label">Время открытия заслонки (мс)</div>
+      <input type="number" id="portionTimeInput" class="input" placeholder="500">
+      <button class="btn secondary" onclick="setPortion()">Сохранить</button>
+    </div>
+    <div class="card">
+      <div class="label">Калибровка миски</div>
+      <button class="btn secondary" onclick="calibrate('miska','empty')">Запомнить как пустую</button>
+      <button class="btn secondary" onclick="calibrate('miska','full')">Запомнить как полную</button>
+    </div>
+    <div class="card">
+      <div class="label">Калибровка бака</div>
+      <button class="btn secondary" onclick="calibrate('bak','empty')">Запомнить как пустой</button>
+      <button class="btn secondary" onclick="calibrate('bak','full')">Запомнить как полный</button>
+    </div>
+    <div class="card">
+      <div class="label">Сменить пароль</div>
+      <input type="password" id="newPass" class="input" placeholder="Новый пароль">
+      <button class="btn secondary" onclick="changePassword()">Сохранить</button>
+    </div>
+    <button class="btn secondary" style="margin-top:20px;" onclick="logout()">Выйти</button>
+  </div>
+
+  <!-- Таб-бар -->
+  <div class="tab-bar">
+    <div class="tab active" data-tab="dash">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+      Главная
+    </div>
+    <div class="tab" data-tab="log">
+      <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
+      Лог
+    </div>
+    <div class="tab" data-tab="schedule">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12,6 12,12 16,14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      Распис.
+    </div>
+    <div class="tab" data-tab="settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
+      Настр.
+    </div>
+  </div>
 </div>
 
 <script>
-  // Новый региональный URL
-  const DB_URL = "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app";
-  const PASSWORD = '1321';
+  const DB = "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app";
+  const PASS = '1321';
 
+  // ----- Утилиты -----
+  const get = (path) => fetch(DB + path + '.json').then(r => r.json());
+  const put = (path, data) => fetch(DB + path + '.json', { method: 'PUT', body: JSON.stringify(data) });
+
+  // ----- Авторизация -----
   if (localStorage.getItem('auth') === '1') {
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    startUpdates();
+    initApp();
   }
 
-  function login() {
-    if (document.getElementById('pass').value === PASSWORD) {
+  window.login = () => {
+    if (document.getElementById('pass').value === PASS) {
       localStorage.setItem('auth', '1');
       location.reload();
     } else alert('Неверный пароль');
+  };
+
+  // ----- Инициализация -----
+  let selectedDays = new Set();
+  let currentTab = 'dash';
+  let sensorTimer, logTimer;
+
+  function initApp() {
+    setupTabs();
+    setupDaysChips();
+    refreshSensors();
+    refreshLog();
+    checkStatus();
+    sensorTimer = setInterval(refreshSensors, 3000);
+    logTimer = setInterval(refreshLog, 10000);
   }
 
-  function startUpdates() {
-    setInterval(updateSensors, 2000);
-    updateSensors();
-  }
-
-  function updateSensors() {
-    fetch(`${DB_URL}/sensors.json`)
-      .then(r => r.json())
-      .then(data => {
-        if (data) {
-          if (data.miska !== undefined) {
-            document.getElementById('miska').textContent = parseFloat(data.miska).toFixed(1) + ' см';
-          }
-          if (data.bak !== undefined) {
-            document.getElementById('bak').textContent = parseFloat(data.bak).toFixed(1) + ' см';
-            let empty = parseFloat(localStorage.getItem('bakEmpty') || 35);
-            let full = parseFloat(localStorage.getItem('bakFull') || 5);
-            if (full < empty) {
-              let pct = ((empty - data.bak) / (empty - full)) * 100;
-              pct = Math.max(0, Math.min(100, pct));
-              document.getElementById('bakBar').style.height = pct + '%';
-              document.getElementById('bakPct').textContent = Math.round(pct) + '%';
-            }
-          }
-          document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--green)"></span>';
-        } else {
-          document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--red)"></span>';
-        }
-      })
-      .catch(() => {
-        document.getElementById('conn').innerHTML = '<span class="status-dot" style="background:var(--red)"></span>';
+  // ----- Табы -----
+  function setupTabs() {
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+        document.getElementById(target).classList.add('active');
+        currentTab = target;
       });
-
-    fetch(`${DB_URL}/status.json`)
-      .then(r => r.json())
-      .then(val => {
-        if (val) document.getElementById('lastEvent').textContent = val;
-      });
-  }
-
-  function feed() {
-    fetch(`${DB_URL}/feed_command.json`, {
-      method: 'PUT',
-      body: 'true'
     });
   }
 
-  function feedLater() {
-    let h = parseInt(document.getElementById('delayH').value) || 0;
-    let m = parseInt(document.getElementById('delayM').value) || 0;
-    if (h===0 && m===0) return alert('Введите время');
-    fetch(`${DB_URL}/feed_later.json`, {
-      method: 'PUT',
-      body: JSON.stringify({ hours: h, minutes: m })
-    });
-    alert('Запланировано');
+  // ----- Датчики и статус -----
+  async function refreshSensors() {
+    try {
+      const sensors = await get('/sensors');
+      if (sensors) {
+        document.getElementById('miskaVal').textContent = (sensors.miska || '--') + ' см';
+        document.getElementById('bakVal').textContent = (sensors.bak || '--') + ' см';
+        updateBakBar(sensors.bak);
+        setOnline(true);
+      } else {
+        setOnline(false);
+      }
+    } catch (e) { setOnline(false); }
   }
+
+  function updateBakBar(bakDist) {
+    const empty = parseFloat(localStorage.getItem('bakEmpty') || 35);
+    const full = parseFloat(localStorage.getItem('bakFull') || 5);
+    if (full < empty && bakDist) {
+      let pct = ((empty - bakDist) / (empty - full)) * 100;
+      pct = Math.max(0, Math.min(100, pct));
+      document.getElementById('bakBar').style.height = pct + '%';
+      document.getElementById('bakPct').textContent = Math.round(pct) + '%';
+    }
+  }
+
+  function setOnline(online) {
+    const dot = document.querySelector('#conn .status-dot');
+    const text = document.querySelector('#conn');
+    if (online) {
+      dot.style.background = 'var(--green)';
+      text.innerHTML = '<span class="status-dot" style="background:var(--green)"></span> Онлайн';
+    } else {
+      dot.style.background = 'var(--red)';
+      text.innerHTML = '<span class="status-dot" style="background:var(--red)"></span> Офлайн';
+    }
+  }
+
+  async function checkStatus() {
+    const status = await get('/status');
+    if (status) document.getElementById('lastEvent').textContent = status;
+  }
+
+  // ----- Лог -----
+  async function refreshLog() {
+    const logs = await get('/logs');
+    const list = document.getElementById('logList');
+    if (!logs) { list.innerHTML = '<li>Нет записей</li>'; return; }
+    const entries = Object.entries(logs).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 50);
+    list.innerHTML = entries.map(([key, val]) => {
+      const date = new Date(key * 1000);
+      const time = date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const type = val.type === 'manual' ? 'Вручную' : val.type === 'schedule' ? 'Расписание' : 'Отлож.';
+      return `<li>${time} — ${type}</li>`;
+    }).join('');
+  }
+
+  async function loadLogs() { await refreshLog(); }
+
+  // ----- Кормление -----
+  window.feed = async () => {
+    await put('/feed_command', true);
+    showBanner('Команда отправлена');
+  };
+
+  window.feedLater = async () => {
+    const h = parseInt(document.getElementById('delayH').value) || 0;
+    const m = parseInt(document.getElementById('delayM').value) || 0;
+    if (h === 0 && m === 0) return alert('Введите время');
+    await put('/feed_later', { hours: h, minutes: m });
+    showBanner('Отложенное кормление запланировано');
+  };
+
+  // ----- Расписание -----
+  function setupDaysChips() {
+    document.querySelectorAll('#daysSelect .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        chip.classList.toggle('selected');
+        if (chip.classList.contains('selected')) selectedDays.add(chip.dataset.day);
+        else selectedDays.delete(chip.dataset.day);
+      });
+    });
+  }
+
+  window.addSchedule = async () => {
+    const time = document.getElementById('timeInput').value;
+    if (!time) return alert('Введите время');
+    const [h, m] = time.split(':').map(Number);
+    const days = Array.from(selectedDays).map(Number);
+    if (days.length === 0) return alert('Выберите дни');
+    // Сохраняем в Firebase
+    const sched = await get('/schedule') || [];
+    sched.push({ days, hour: h, minute: m, active: true });
+    await put('/schedule', sched);
+    // Также отправляем команду ESP32 для немедленного обновления (или оно само подхватит при следующем чтении)
+    await put('/schedule_save', sched);
+    renderSchedule(sched);
+  };
+
+  async function renderSchedule() {
+    const sched = await get('/schedule') || [];
+    const list = document.getElementById('scheduleList');
+    list.innerHTML = sched.map((item, idx) => {
+      const days = item.days.map(d => ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d]).join(', ');
+      return `<li>${days} в ${item.hour}:${String(item.minute).padStart(2,'0')} <button onclick="deleteSchedule(${idx})" style="margin-left:10px; background:var(--red); color:white; border:none; border-radius:8px; padding:4px 10px;">Удалить</button></li>`;
+    }).join('');
+  }
+
+  window.deleteSchedule = async (idx) => {
+    const sched = await get('/schedule') || [];
+    sched.splice(idx, 1);
+    await put('/schedule', sched);
+    await put('/schedule_save', sched);
+    renderSchedule();
+  };
+
+  // ----- Калибровка -----
+  window.calibrate = (sensor, type) => {
+    put('/calibrate', { sensor, type });
+    showBanner('Запрос калибровки отправлен');
+  };
+
+  window.setPortion = () => {
+    const val = document.getElementById('portionTimeInput').value;
+    if (val) put('/settings/portion', Number(val));
+    showBanner('Порция сохранена');
+  };
+
+  // ----- Пароль -----
+  window.changePassword = () => {
+    const newPass = document.getElementById('newPass').value;
+    if (!newPass) return;
+    localStorage.setItem('password', newPass);
+    alert('Пароль изменён. Новый пароль будет действовать после перезагрузки.');
+  };
+
+  window.logout = () => {
+    localStorage.removeItem('auth');
+    location.reload();
+  };
+
+  // ----- Баннер уведомлений -----
+  function showBanner(msg) {
+    const banner = document.getElementById('banner');
+    banner.textContent = msg;
+    banner.classList.add('show');
+    setTimeout(() => banner.classList.remove('show'), 3000);
+  }
+
+  // Запрос разрешения на уведомления
+  if (Notification.permission === 'default') Notification.requestPermission();
 </script>
 </body>
 </html>
