@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
   <title>🐱 Кормушка (Firebase + Анимации)</title>
   <style>
-    /* ======== ВСЕ СТИЛИ И АНИМАЦИИ (без изменений) ======== */
+    /* ======== ВСЕ СТИЛИ И АНИМАЦИИ (без изменений, кроме пары улучшений для доступности) ======== */
     :root {
       --bg: #f2f2f7;
       --card-bg: rgba(255,255,255,0.75);
@@ -72,16 +72,8 @@
       opacity: 1;
       transform: translateY(0);
     }
-    #login-screen {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      padding: 20px;
-      background: var(--bg);
-    }
-    #login-screen.hidden { display: none; }
+    /* Экран входа больше не нужен – удалён из HTML, но стиль оставим для совместимости (если где-то осталось) */
+    #login-screen { display: none; }
     #app-screen.hidden { display: none; }
     .card {
       background: var(--card-bg);
@@ -161,6 +153,11 @@
       box-shadow: none;
     }
     .btn.secondary:active { background: rgba(0,122,255,0.1); }
+    /* Стили для отключённой кнопки во время отправки */
+    .btn:disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
     .status-dot {
       display: inline-block;
       width: 10px;
@@ -270,12 +267,23 @@
       transform: translateY(-120%);
       transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
       font-size: 14px;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       opacity: 0;
     }
     .notification-banner.show {
       transform: translateY(0);
       opacity: 1;
+    }
+    .notification-banner .close-banner {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      margin-left: 12px;
+      padding: 0 4px;
     }
     .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .filter-btn {
@@ -319,28 +327,18 @@
   </style>
 </head>
 <body>
-<div class="notification-banner" id="banner" role="status" aria-live="polite"></div>
-
-<!-- Экран входа -->
-<div id="login-screen">
-  <h2 class="spring" style="margin-bottom:12px;">🐱 Кормушка</h2>
-  <p style="color:var(--secondary); margin-bottom:24px; text-align:center;">Для просмотра статуса войдите как гость.<br>Для управления войдите как администратор.</p>
-  <div style="width:100%; max-width:300px;">
-    <input type="email" id="emailInput" class="input" placeholder="Email администратора">
-    <input type="password" id="passInput" class="input" placeholder="Пароль">
-    <button class="btn" onclick="loginAdmin()" style="margin-top:12px;">Войти как администратор</button>
-    <p id="loginError" class="error-message hidden">Неверный email или пароль</p>
-  </div>
-  <button class="btn secondary" style="max-width:260px; margin-top:20px;" onclick="loginGuest()">Войти как гость</button>
+<div class="notification-banner" id="banner" role="status" aria-live="polite">
+  <span id="bannerText"></span>
+  <button class="close-banner" aria-label="Закрыть уведомление" onclick="hideBanner()">✕</button>
 </div>
 
-<!-- Основной экран -->
-<div id="app-screen" class="hidden">
+<!-- Основной экран (больше нет экрана входа) -->
+<div id="app-screen">
   <div class="header">🐱 Кормушка</div>
   
   <div id="dash" class="content active" role="tabpanel">
     <div class="card" style="display:flex; align-items:center; gap:12px;">
-      <span style="font-size:28px;">📶</span>
+      <span style="font-size:28px;" aria-hidden="true">📶</span>
       <div>
         <div class="row"><span class="label">Статус</span><span id="conn"><span class="status-dot" style="background:var(--red)"></span> Офлайн</span></div>
         <div id="wifiStrength" style="font-size:12px; color:var(--secondary);">-- dBm</div>
@@ -364,7 +362,8 @@
         <span id="bakPct" style="font-size:16px; font-weight:500; color:var(--secondary);">0%</span>
       </div>
     </div>
-    <div id="adminControls" class="card hidden">
+    <!-- Админ-панель всегда видна, класс hidden убран -->
+    <div id="adminControls" class="card">
       <button class="btn" onclick="feedNow()">🥣 Покормить сейчас</button>
       <div style="margin:12px 0; display:flex; gap:8px;">
         <input type="number" id="delayH" placeholder="Часы" class="input" style="flex:1" min="0" max="23" value="0">
@@ -423,50 +422,52 @@
     <div class="card text-center">
       <p style="color:var(--secondary); font-size:13px;">Версия Firebase • Анимации ✨</p>
     </div>
-    <button class="btn secondary" style="margin-top:20px;" onclick="logout()">Выйти</button>
+    <!-- Кнопка выхода больше не нужна -->
   </div>
 
   <div class="tab-bar" role="tablist">
-    <div class="tab active" data-tab="dash" tabindex="0">
-      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+    <div class="tab active" data-tab="dash" tabindex="0" role="tab" aria-selected="true" aria-controls="dash" aria-label="Главная">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
       Главная
     </div>
-    <div class="tab" data-tab="log" tabindex="-1">
-      <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
+    <div class="tab" data-tab="log" tabindex="-1" role="tab" aria-selected="false" aria-controls="log" aria-label="Лог">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
       Лог
     </div>
-    <div class="tab" data-tab="schedule" tabindex="-1">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12,6 12,12 16,14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <div class="tab" data-tab="schedule" tabindex="-1" role="tab" aria-selected="false" aria-controls="schedule" aria-label="Расписание">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12,6 12,12 16,14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
       Распис.
     </div>
-    <div class="tab" data-tab="settings" tabindex="-1">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
+    <div class="tab" data-tab="settings" tabindex="-1" role="tab" aria-selected="false" aria-controls="settings" aria-label="Настройки">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
       Настр.
     </div>
   </div>
 </div>
 
-<!-- Firebase SDK -->
+<!-- Firebase SDK – только нужные модули -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getAuth, signInWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  import { getDatabase, ref, get as dbGet, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+  import { getDatabase, ref, get as dbGet, set, onValue, off, push, remove, query, orderByKey, limitToLast } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-  // ⚠️ ЗАМЕНИТЕ НА КОНФИГУРАЦИЮ ВАШЕГО ПРОЕКТА
-const firebaseConfig = {
-  apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
-  authDomain: "kormushka-app.firebaseapp.com",
-  databaseURL: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kormushka-app",
-  storageBucket: "kormushka-app.firebasestorage.app",
-  messagingSenderId: "414413182022",
-  appId: "1:414413182022:web:ab2133d2ccf624c0eee647",
-  measurementId: "G-VCYGYH585G"
-};
+  // ⚠️ КОНФИГУРАЦИЯ ТВОЕГО ПРОЕКТА (оставь как было)
+  const firebaseConfig = {
+    apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
+    authDomain: "kormushka-app.firebaseapp.com",
+    databaseURL: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "kormushka-app",
+    storageBucket: "kormushka-app.firebasestorage.app",
+    messagingSenderId: "414413182022",
+    appId: "1:414413182022:web:ab2133d2ccf624c0eee647",
+    measurementId: "G-VCYGYH585G"
+  };
 
   const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
   const db = getDatabase(app);
+
+  // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
+  let selectedDays = new Set();
+  let bannerTimeout = null;
 
   // ========== УТИЛИТЫ ==========
   function sanitizeHTML(str) {
@@ -475,81 +476,44 @@ const firebaseConfig = {
     return div.innerHTML;
   }
 
-  function showBanner(msg, duration = 3000) {
+  function showBanner(msg, duration = 4000) {
     const banner = document.getElementById('banner');
-    banner.textContent = msg;
+    const textEl = document.getElementById('bannerText');
+    if (bannerTimeout) clearTimeout(bannerTimeout);
+    textEl.textContent = msg;
     banner.classList.add('show');
-    setTimeout(() => banner.classList.remove('show'), duration);
+    bannerTimeout = setTimeout(() => banner.classList.remove('show'), duration);
   }
 
-async function isAdminUser() {
-  const user = auth.currentUser;
-  if (!user) return false;
-  // Замените 'ВАШ_UID' на реальный UID (можно найти в консоли Firebase → Authentication → Users)
-  if (user.uid === 'ВАШ_UID') return true;
-  const token = await user.getIdTokenResult();
-  return token.claims.admin === true;
-}
-
-  // ========== АВТОРИЗАЦИЯ ==========
-  window.loginAdmin = async () => {
-    const email = document.getElementById('emailInput').value;
-    const pass = document.getElementById('passInput').value;
-    const errEl = document.getElementById('loginError');
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-      errEl.classList.add('hidden');
-      // при успешном входе onAuthStateChanged сам покажет приложение
-    } catch (e) {
-      errEl.textContent = 'Неверный email или пароль';
-      errEl.classList.remove('hidden');
-    }
+  window.hideBanner = function() {
+    document.getElementById('banner').classList.remove('show');
+    if (bannerTimeout) clearTimeout(bannerTimeout);
   };
 
-  window.loginGuest = () => signInAnonymously(auth);
+  // Запрос разрешения на уведомления при старте
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 
-  window.logout = () => signOut(auth);
-
-  // ========== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ПО АУТЕНТИФИКАЦИИ ==========
-  let appInitialized = false;
-  let unsubscribes = [];
-
-  onAuthStateChanged(auth, async (user) => {
-    const loginScreen = document.getElementById('login-screen');
+  // ========== ИНИЦИАЛИЗАЦИЯ ПОСЛЕ ЗАГРУЗКИ DOM ==========
+  document.addEventListener('DOMContentLoaded', () => {
+    // Показываем основной экран (логин-скрин удалён)
     const appScreen = document.getElementById('app-screen');
-    if (user) {
-      loginScreen.classList.add('hidden');
-      appScreen.classList.remove('hidden');
-      // Определить админа
-      const admin = user.isAnonymous ? false : await isAdminUser();
-      const adminControls = document.getElementById('adminControls');
-      if (admin) {
-        adminControls.classList.remove('hidden');
-      } else {
-        adminControls.classList.add('hidden');
-      }
-      if (!appInitialized) {
-        initApp(admin);
-        appInitialized = true;
-      }
-    } else {
-      // Выход
-      loginScreen.classList.remove('hidden');
-      appScreen.classList.add('hidden');
-      if (appInitialized) {
-        // Отписаться от всех слушателей Firebase
-        unsubscribes.forEach(fn => fn());
-        unsubscribes = [];
-        appInitialized = false;
-      }
-    }
+    appScreen.classList.remove('hidden');
+    // Админ-панель всегда видна
+    document.getElementById('adminControls').classList.remove('hidden');
+
+    initApp();
   });
 
-  // ========== ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ==========
-  function initApp(isAdmin) {
+  // ========== ОСНОВНАЯ ИНИЦИАЛИЗАЦИЯ ==========
+  let unsubscribes = [];
+
+  function initApp() {
     setupTabs();
     setupDaysChips();
-    
+    loadPortionTime(); // загрузить сохранённую порцию
+
     // Подписка на датчики
     const sensorsRef = ref(db, 'sensors');
     const unsubSensors = onValue(sensorsRef, (snapshot) => {
@@ -570,17 +534,17 @@ async function isAdminUser() {
     });
     unsubscribes.push(unsubRssi);
 
-    // Логи
-    const logsRef = ref(db, 'logs');
+    // Логи – теперь запрашиваем последние 100 записей, сортировка на сервере
+    const logsRef = query(ref(db, 'logs'), orderByKey(), limitToLast(100));
     const unsubLogs = onValue(logsRef, (snapshot) => {
       historyLog.processData(snapshot.val());
     });
     unsubscribes.push(unsubLogs);
 
-    // Расписание
+    // Расписание – теперь это объект с ключами
     const scheduleRef = ref(db, 'schedule');
     const unsubSchedule = onValue(scheduleRef, (snapshot) => {
-      renderSchedule(snapshot.val() || []);
+      renderSchedule(snapshot.val());
     });
     unsubscribes.push(unsubSchedule);
 
@@ -593,36 +557,76 @@ async function isAdminUser() {
     });
     unsubscribes.push(unsubDnd);
 
-    // Калибровка из базы
-    loadCalibration();
+    // Калибровка – подписка в реальном времени
+    const calibrationRef = ref(db, 'calibration');
+    const unsubCal = onValue(calibrationRef, (snapshot) => {
+      calibration = snapshot.val() || { miska: {}, bak: {} };
+      // пересчитать бары при изменении калибровки
+      const sensorsSnap = document.getElementById('miskaVal').textContent;
+      // Мы можем заново прочитать значения из датчиков (уже есть в UI)
+      updateBarsFromCurrentValues();
+    });
+    unsubscribes.push(unsubCal);
 
-    // Проверка низкого уровня корма
-    const checkFoodTimer = setInterval(async () => {
-      try {
-        const snap = await dbGet(ref(db, 'low_food_alert'));
-        if (snap.val() === true) {
-          showBanner('⚠️ В баке заканчивается корм!');
-          if (Notification.permission === 'granted') {
-            new Notification('🐱 Кормушка', { body: 'В баке заканчивается корм!', icon: '/icon-192.png' });
-          }
+    // Подписка на low_food_alert вместо интервала
+    const lowFoodRef = ref(db, 'low_food_alert');
+    const unsubLow = onValue(lowFoodRef, (snapshot) => {
+      if (snapshot.val() === true) {
+        showBanner('⚠️ В баке заканчивается корм!');
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('🐱 Кормушка', { body: 'В баке заканчивается корм!', icon: '/icon-192.png' });
         }
-      } catch {}
-    }, 10000);
-    unsubscribes.push(() => clearInterval(checkFoodTimer));
-  }
+      }
+    });
+    unsubscribes.push(unsubLow);
 
-  // ========== ТАБЫ ==========
-  function setupTabs() {
-    document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    // Очистка при закрытии окна (не обязательно, но хорошо)
+    window.addEventListener('beforeunload', () => {
+      unsubscribes.forEach(fn => fn());
     });
   }
+
+  // ========== ТАБЫ (доступность) ==========
+  function setupTabs() {
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        switchTab(tab.dataset.tab);
+        tab.focus(); // перемещаем фокус
+      });
+      tab.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          switchTab(tab.dataset.tab);
+          tab.focus();
+        }
+        // Стрелки влево/вправо для tablist
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const tabs = Array.from(document.querySelectorAll('.tab'));
+          let index = tabs.indexOf(tab);
+          if (e.key === 'ArrowRight') index = (index + 1) % tabs.length;
+          else index = (index - 1 + tabs.length) % tabs.length;
+          tabs[index].focus();
+        }
+      });
+    });
+  }
+
   function switchTab(id) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
+      t.tabIndex = -1;
+    });
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
     const tab = document.querySelector(`.tab[data-tab="${id}"]`);
     const content = document.getElementById(id);
-    if (tab && content) { tab.classList.add('active'); content.classList.add('active'); }
+    if (tab && content) {
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+      tab.tabIndex = 0;
+      content.classList.add('active');
+    }
   }
 
   // ========== ДАТЧИКИ ==========
@@ -634,9 +638,15 @@ async function isAdminUser() {
   }
 
   let calibration = { miska: {}, bak: {} };
-  async function loadCalibration() {
-    const snap = await dbGet(ref(db, 'calibration'));
-    if (snap.val()) calibration = snap.val();
+
+  // Вызывается при изменении калибровки, чтобы пересчитать бары без новых данных датчиков
+  function updateBarsFromCurrentValues() {
+    const miskaText = document.getElementById('miskaVal').textContent;
+    const bakText = document.getElementById('bakVal').textContent;
+    const miskaDist = miskaText !== '-- см' ? parseFloat(miskaText) : null;
+    const bakDist = bakText !== '-- см' ? parseFloat(bakText) : null;
+    updateBar('miska', miskaDist);
+    updateBar('bak', bakDist);
   }
 
   function updateBar(type, dist) {
@@ -653,33 +663,53 @@ async function isAdminUser() {
     } else {
       bar.style.height = '0%';
       pctEl.textContent = '?%';
+      barContainer.setAttribute('aria-valuenow', 0);
     }
   }
 
   function setOnline(online) {
-    document.getElementById('conn').innerHTML = online ?
+    const connEl = document.getElementById('conn');
+    connEl.innerHTML = online ?
       '<span class="status-dot" style="background:var(--green)"></span> Онлайн' :
       '<span class="status-dot" style="background:var(--red)"></span> Офлайн';
   }
 
-  // ========== КОРМЛЕНИЕ ==========
-  async function requireAdmin() {
-    if (!(await isAdminUser())) { showBanner('Требуются права администратора'); return false; }
-    return true;
-  }
+  // ========== КОРМЛЕНИЕ (без проверки прав) ==========
+  window.feedNow = async () => {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Отправка...';
+    try {
+      await set(ref(db, 'feed_command'), true);
+      showBanner('Команда отправлена');
+    } catch (e) {
+      showBanner('Ошибка: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🥣 Покормить сейчас';
+    }
+  };
 
-  window.feedNow = async () => { if (await requireAdmin()) { await set(ref(db, 'feed_command'), true); showBanner('Команда отправлена'); } };
   window.feedLater = async () => {
-    if (!(await requireAdmin())) return;
     const h = parseInt(document.getElementById('delayH').value) || 0;
     const m = parseInt(document.getElementById('delayM').value) || 0;
     if (h === 0 && m === 0) return showBanner('Введите время');
-    await set(ref(db, 'feed_later'), { hours: h, minutes: m });
-    showBanner('Отложенное кормление запланировано');
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Сохранение...';
+    try {
+      // Используем push для хранения нескольких отложенных кормлений
+      await push(ref(db, 'feed_later'), { hours: h, minutes: m });
+      showBanner('Отложенное кормление запланировано');
+    } catch (e) {
+      showBanner('Ошибка: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⏳ Отложить';
+    }
   };
 
-  // ========== РАСПИСАНИЕ ==========
-  const selectedDays = new Set();
+  // ========== РАСПИСАНИЕ (переделано на push/remove) ==========
   function setupDaysChips() {
     document.querySelectorAll('#daysSelect .chip').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -692,47 +722,67 @@ async function isAdminUser() {
   }
 
   window.addSchedule = async () => {
-    if (!(await requireAdmin())) return;
     const time = document.getElementById('timeInput').value;
     if (!time) return showBanner('Введите время');
     const [h, m] = time.split(':').map(Number);
     const days = Array.from(selectedDays).map(Number);
     if (days.length === 0) return showBanner('Выберите дни');
-    const snap = await dbGet(ref(db, 'schedule'));
-    const sched = snap.val() || [];
-    sched.push({ days, hour: h, minute: m, active: true });
-    await set(ref(db, 'schedule'), sched);
-    selectedDays.clear();
-    document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
-    showBanner('Расписание обновлено');
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Добавление...';
+    try {
+      const newEntry = { days, hour: h, minute: m, active: true };
+      await push(ref(db, 'schedule'), newEntry);
+      // Сброс выбора
+      selectedDays.clear();
+      document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
+      showBanner('Расписание обновлено');
+    } catch (e) {
+      showBanner('Ошибка: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Добавить';
+    }
   };
 
-  window.deleteSchedule = async (idx) => {
-    if (!(await requireAdmin())) return;
-    const snap = await dbGet(ref(db, 'schedule'));
-    const sched = snap.val() || [];
-    sched.splice(idx, 1);
-    await set(ref(db, 'schedule'), sched);
+  window.deleteSchedule = async (key) => {
+    if (!confirm('Удалить это расписание?')) return;
+    try {
+      await remove(ref(db, `schedule/${key}`));
+      showBanner('Расписание удалено');
+    } catch (e) {
+      showBanner('Ошибка: ' + e.message);
+    }
   };
 
-  function renderSchedule(scheduleArray) {
-    document.getElementById('scheduleList').innerHTML = scheduleArray.map((item, idx) => {
+  function renderSchedule(scheduleObject) {
+    const list = document.getElementById('scheduleList');
+    if (!scheduleObject) {
+      list.innerHTML = '<li>Нет расписания</li>';
+      return;
+    }
+    const entries = Object.entries(scheduleObject);
+    list.innerHTML = entries.map(([key, item]) => {
       const daysStr = item.days.map(d => ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d]).join(', ');
-      const timeStr = `${item.hour}:${String(item.minute).padStart(2,'0')}`;
-      return `<li>${daysStr} в ${timeStr} <button onclick="deleteSchedule(${idx})" style="margin-left:10px; background:var(--red); color:white; border:none; border-radius:8px; padding:4px 10px;">Удалить</button></li>`;
+      const timeStr = `${String(item.hour).padStart(2,'0')}:${String(item.minute).padStart(2,'0')}`;
+      return `<li>${daysStr} в ${timeStr} <button onclick="deleteSchedule('${key}')" style="margin-left:10px; background:var(--red); color:white; border:none; border-radius:8px; padding:4px 10px;">Удалить</button></li>`;
     }).join('');
   }
 
   // ========== DND ==========
   window.toggleDND = async () => {
-    if (!(await requireAdmin())) return;
     const snap = await dbGet(ref(db, 'schedule_paused'));
     const newState = !snap.val();
-    await set(ref(db, 'schedule_paused'), newState);
-    showBanner(newState ? 'Режим «Не беспокоить» активирован' : 'Режим «Не беспокоить» выключен');
+    try {
+      await set(ref(db, 'schedule_paused'), newState);
+      showBanner(newState ? 'Режим «Не беспокоить» активирован' : 'Режим «Не беспокоить» выключен');
+    } catch (e) {
+      showBanner('Ошибка: ' + e.message);
+    }
   };
 
-  // ========== ЛОГ ==========
+  // ========== ЛОГ (исправлена обработка null, фильтрация) ==========
   const historyLog = {
     filter: 'all',
     setFilter(type, btn) {
@@ -742,7 +792,12 @@ async function isAdminUser() {
       this.refresh();
     },
     processData(logs) { this.render(logs); },
-    refresh() { dbGet(ref(db, 'logs')).then(snap => this.render(snap.val())).catch(console.error); },
+    refresh() {
+      // Принудительно перечитать последние 100
+      dbGet(query(ref(db, 'logs'), orderByKey(), limitToLast(100)))
+        .then(snap => this.render(snap.val()))
+        .catch(e => showBanner('Ошибка загрузки логов: ' + e.message));
+    },
     render(logs) {
       const list = document.getElementById('logList');
       if (!logs) { list.innerHTML = '<li>Нет записей</li>'; return; }
@@ -770,17 +825,35 @@ async function isAdminUser() {
 
   // ========== НАСТРОЙКИ ==========
   window.calibrate = async (sensor, type) => {
-    if (!(await requireAdmin())) return;
-    await set(ref(db, 'calibrate'), { sensor, type });
-    showBanner(`Запрос калибровки ${sensor} (${type}) отправлен`);
+    try {
+      await set(ref(db, 'calibrate'), { sensor, type });
+      showBanner(`Запрос калибровки ${sensor} (${type}) отправлен`);
+    } catch (e) {
+      showBanner('Ошибка: ' + e.message);
+    }
   };
+
   window.savePortion = async () => {
-    if (!(await requireAdmin())) return;
     const val = parseInt(document.getElementById('portionTimeInput').value);
     if (isNaN(val) || val < 100 || val > 5000) return showBanner('Введите корректное значение (100-5000)');
-    await set(ref(db, 'settings/portion'), val);
-    showBanner('Порция сохранена');
+    try {
+      await set(ref(db, 'settings/portion'), val);
+      showBanner('Порция сохранена');
+    } catch (e) {
+      showBanner('Ошибка: ' + e.message);
+    }
   };
+
+  async function loadPortionTime() {
+    try {
+      const snap = await dbGet(ref(db, 'settings/portion'));
+      if (snap.exists()) {
+        document.getElementById('portionTimeInput').value = snap.val();
+      }
+    } catch (e) {
+      // не критично
+    }
+  }
 </script>
 </body>
 </html>
