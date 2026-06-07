@@ -1,11 +1,14 @@
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Кормушка</title>
+  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <title>🐱 Кормушка 3.0</title>
   <style>
     :root {
       --bg: #f2f2f7;
@@ -109,6 +112,9 @@
       position: relative;
       overflow: hidden;
     }
+    .btn:focus-visible {
+      box-shadow: 0 0 0 3px rgba(0,122,255,0.5);
+    }
     .btn::after {
       content: '';
       position: absolute;
@@ -173,13 +179,19 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-size: 10px;
+      font-size: 12px;
       color: var(--secondary);
       cursor: pointer;
       transition: color 0.2s;
+      min-width: 48px;
+      min-height: 48px;
     }
     .tab.active { color: var(--accent); }
     .tab svg { width: 24px; height: 24px; margin-bottom: 2px; fill: currentColor; }
+    .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    input, select, button {
+      font-family: inherit;
+    }
     .input, select {
       width: 100%;
       padding: 12px 16px;
@@ -190,6 +202,11 @@
       background: var(--bg);
       color: var(--text);
       outline: none;
+      transition: border-color 0.2s;
+    }
+    .input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,122,255,0.2);
     }
     .chip {
       display: inline-block;
@@ -223,11 +240,15 @@
       box-shadow: var(--shadow);
       z-index: 20;
       transform: translateY(-120%);
-      transition: transform 0.3s ease;
+      transition: transform 0.3s ease, opacity 0.3s ease;
       font-size: 14px;
       text-align: center;
+      opacity: 0;
     }
-    .notification-banner.show { transform: translateY(0); }
+    .notification-banner.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
     .filter-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
     .filter-btn {
       padding: 6px 14px;
@@ -237,29 +258,63 @@
       border: none;
       font-size: 13px;
       cursor: pointer;
+      transition: background 0.2s, color 0.2s;
     }
     .filter-btn.active { background: var(--accent); color: white; }
+    .hidden { display: none !important; }
+    .text-center { text-align: center; }
+    .mt-2 { margin-top: 12px; }
+    /* skeleton loading */
+    @keyframes shimmer {
+      0% { background-position: -200px 0; }
+      100% { background-position: calc(200px + 100%) 0; }
+    }
+    .skeleton {
+      background: linear-gradient(90deg, var(--bar-bg) 25%, rgba(255,255,255,0.2) 50%, var(--bar-bg) 75%);
+      background-size: 200px 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+      display: inline-block;
+    }
+    .error-message { color: var(--red); font-size: 14px; margin: 8px 0; }
+    /* spinner */
+    .spinner {
+      width: 24px; height: 24px;
+      border: 3px solid var(--bar-bg);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-<div class="notification-banner" id="banner"></div>
+<div class="notification-banner" id="banner" role="status" aria-live="polite"></div>
 
 <!-- Экран входа -->
-<div id="login" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px; background:var(--bg);">
+<div id="login" class="content" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px; background:var(--bg);">
   <h2>🐱 Кормушка</h2>
-  <p style="color:var(--secondary); margin:12px 0; text-align:center;">Для просмотра статуса нажмите «Продолжить без пароля».<br>Для управления войдите.</p>
-  <input type="password" id="pass" class="input" placeholder="Пароль (для управления)" style="max-width:260px">
-  <button class="btn" style="max-width:260px" onclick="login(true)">Войти</button>
-  <button class="btn secondary" style="max-width:260px; margin-top:8px;" onclick="login(false)">Продолжить без пароля</button>
+  <p style="color:var(--secondary); margin:12px 0; text-align:center;">Для просмотра статуса нажмите «Войти как гость».<br>Для управления войдите как администратор.</p>
+  <div id="loginForm" class="hidden">
+    <input type="email" id="email" class="input" placeholder="Email администратора">
+    <input type="password" id="pass" class="input" placeholder="Пароль">
+    <button class="btn" onclick="auth.signInWithEmail()">Войти</button>
+    <p id="loginError" class="error-message hidden"></p>
+  </div>
+  <button class="btn secondary" style="max-width:260px; margin-top:16px;" onclick="auth.signInAnonymously()">Войти как гость</button>
+  <button class="btn secondary" style="max-width:260px;" onclick="document.getElementById('loginForm').classList.toggle('hidden')">Администратор</button>
 </div>
 
-<div id="app" style="display:none;">
+<div id="app" class="hidden">
   <div class="header">🐱 Кормушка</div>
   
   <!-- Главная -->
-  <div id="dash" class="content active">
+  <div id="dash" class="content active" role="tabpanel" aria-labelledby="tab-dash">
     <div class="card" style="display:flex; align-items:center; gap:12px;">
-      <span style="font-size:28px;">📶</span>
+      <span style="font-size:28px;" aria-hidden="true">📶</span>
       <div>
         <div class="row"><span class="label">Статус</span><span id="conn"><span class="status-dot" style="background:var(--red)"></span> Офлайн</span></div>
         <div id="wifiStrength" style="font-size:12px; color:var(--secondary);">-- dBm</div>
@@ -268,45 +323,51 @@
     <div class="card">
       <div class="row"><span class="label">🥣 Миска</span><span class="value" id="miskaVal">-- см</span></div>
       <div style="display:flex; align-items:center; margin-top:12px;">
-        <div class="bar-container"><div class="bar-fill" id="miskaBar" style="height:0%;"></div></div>
+        <div class="bar-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Уровень в миске">
+          <div class="bar-fill" id="miskaBar" style="height:0%;"></div>
+        </div>
         <span id="miskaPct" style="font-size:16px; font-weight:500; color:var(--secondary);">0%</span>
       </div>
     </div>
     <div class="card">
       <div class="row"><span class="label">🛢️ Бак</span><span class="value" id="bakVal">-- см</span></div>
       <div style="display:flex; align-items:center; margin-top:12px;">
-        <div class="bar-container"><div class="bar-fill" id="bakBar" style="height:0%;"></div></div>
+        <div class="bar-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Уровень в баке">
+          <div class="bar-fill" id="bakBar" style="height:0%;"></div>
+        </div>
         <span id="bakPct" style="font-size:16px; font-weight:500; color:var(--secondary);">0%</span>
       </div>
     </div>
     <div class="card" id="lastEvent" style="font-size:14px; color:var(--secondary);">Нет событий</div>
-    <button class="btn" onclick="feed()" id="feedBtn">🥣 Покормить сейчас</button>
-    <div style="margin:12px 0; display:flex; gap:8px;">
-      <input type="number" id="delayH" placeholder="Часы" class="input" style="flex:1">
-      <input type="number" id="delayM" placeholder="Минуты" class="input" style="flex:1">
-      <button class="btn secondary" style="flex:1; margin-top:0;" onclick="feedLater()">⏳ Отложить</button>
+    <div id="adminControls">
+      <button class="btn" onclick="feeding.feedNow()" id="feedBtn">🥣 Покормить сейчас</button>
+      <div style="margin:12px 0; display:flex; gap:8px;">
+        <input type="number" id="delayH" placeholder="Часы" class="input" style="flex:1" min="0" max="23" value="0">
+        <input type="number" id="delayM" placeholder="Минуты" class="input" style="flex:1" min="0" max="59" value="0">
+        <button class="btn secondary" style="flex:1; margin-top:0;" onclick="feeding.feedLater()">⏳ Отложить</button>
+      </div>
+      <button class="btn secondary" id="dndToggle" onclick="scheduling.toggleDND()">🔕 Включить «Не беспокоить»</button>
     </div>
-    <button class="btn secondary" id="dndToggle" onclick="toggleDND()">🔕 Включить режим «Не беспокоить»</button>
   </div>
 
   <!-- Лог -->
-  <div id="log" class="content">
+  <div id="log" class="content" role="tabpanel" aria-labelledby="tab-log">
     <div class="card">
       <h3 style="margin-bottom:12px;">📋 История кормлений</h3>
       <div class="filter-bar">
-        <button class="filter-btn active" onclick="filterLog('all', this)">Все</button>
-        <button class="filter-btn" onclick="filterLog('manual', this)">Ручные</button>
-        <button class="filter-btn" onclick="filterLog('smart', this)">Умные</button>
-        <button class="filter-btn" onclick="filterLog('schedule', this)">Расписание</button>
+        <button class="filter-btn active" onclick="historyLog.setFilter('all', this)">Все</button>
+        <button class="filter-btn" onclick="historyLog.setFilter('manual', this)">Ручные</button>
+        <button class="filter-btn" onclick="historyLog.setFilter('smart', this)">Умные</button>
+        <button class="filter-btn" onclick="historyLog.setFilter('schedule', this)">Расписание</button>
       </div>
-      <input type="date" id="logDateFilter" class="input" onchange="refreshLog()">
-      <button class="btn secondary" onclick="refreshLog()">Обновить</button>
+      <input type="date" id="logDateFilter" class="input" onchange="historyLog.refresh()" max="">
+      <button class="btn secondary" onclick="historyLog.refresh()">🔄 Обновить</button>
       <ul id="logList" style="margin-top:12px;"></ul>
     </div>
   </div>
 
   <!-- Расписание -->
-  <div id="schedule" class="content">
+  <div id="schedule" class="content" role="tabpanel" aria-labelledby="tab-schedule">
     <div class="card">
       <h3 style="margin-bottom:12px;">⏰ Расписание кормлений</h3>
       <div id="daysSelect" style="margin-bottom:12px;">
@@ -315,165 +376,305 @@
       </div>
       <div style="display:flex; gap:8px;">
         <input type="time" id="timeInput" class="input" value="09:00" style="flex:1">
-        <button class="btn" style="flex:1; margin-top:0;" onclick="addSchedule()">Добавить</button>
+        <button class="btn" style="flex:1; margin-top:0;" onclick="scheduling.add()">Добавить</button>
       </div>
       <ul id="scheduleList" style="margin-top:12px;"></ul>
     </div>
   </div>
 
   <!-- Настройки -->
-  <div id="settings" class="content">
+  <div id="settings" class="content" role="tabpanel" aria-labelledby="tab-settings">
     <div class="card">
       <div class="label">Время открытия заслонки (мс)</div>
-      <input type="number" id="portionTimeInput" class="input" placeholder="500">
-      <button class="btn secondary" onclick="setPortion()">Сохранить</button>
+      <input type="number" id="portionTimeInput" class="input" placeholder="500" min="100" max="5000">
+      <button class="btn secondary" onclick="settings.setPortion()">Сохранить</button>
     </div>
     <div class="card">
       <div class="label">Калибровка миски</div>
-      <button class="btn secondary" onclick="calibrate('miska','empty')">Запомнить как пустую</button>
-      <button class="btn secondary" onclick="calibrate('miska','full')">Запомнить как полную</button>
+      <button class="btn secondary" onclick="settings.calibrate('miska','empty')">Запомнить как пустую</button>
+      <button class="btn secondary" onclick="settings.calibrate('miska','full')">Запомнить как полную</button>
     </div>
     <div class="card">
       <div class="label">Калибровка бака</div>
-      <button class="btn secondary" onclick="calibrate('bak','empty')">Запомнить как пустой</button>
-      <button class="btn secondary" onclick="calibrate('bak','full')">Запомнить как полный</button>
-    </div>
-    <div class="card">
-      <div class="label">Сменить пароль</div>
-      <input type="password" id="newPass" class="input" placeholder="Новый пароль">
-      <button class="btn secondary" onclick="changePassword()">Сохранить</button>
+      <button class="btn secondary" onclick="settings.calibrate('bak','empty')">Запомнить как пустой</button>
+      <button class="btn secondary" onclick="settings.calibrate('bak','full')">Запомнить как полный</button>
     </div>
     <div class="card" style="text-align:center;">
-      <p style="color:var(--secondary); font-size:13px;">Версия 2.0 • Сделано с ❤️</p>
+      <p style="color:var(--secondary); font-size:13px;">Версия 3.0 • Сделано с ❤️</p>
     </div>
-    <button class="btn secondary" style="margin-top:20px;" onclick="logout()">Выйти</button>
+    <button class="btn secondary" style="margin-top:20px;" onclick="auth.signOut()">Выйти</button>
   </div>
 
   <!-- Таб-бар -->
-  <div class="tab-bar">
-    <div class="tab active" data-tab="dash">
+  <div class="tab-bar" role="tablist">
+    <div class="tab active" data-tab="dash" role="tab" aria-selected="true" aria-controls="dash" id="tab-dash" tabindex="0">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
       Главная
     </div>
-    <div class="tab" data-tab="log">
+    <div class="tab" data-tab="log" role="tab" aria-selected="false" aria-controls="log" id="tab-log" tabindex="-1">
       <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2"/><line x1="8" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2"/><line x1="8" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
       Лог
     </div>
-    <div class="tab" data-tab="schedule">
+    <div class="tab" data-tab="schedule" role="tab" aria-selected="false" aria-controls="schedule" id="tab-schedule" tabindex="-1">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><polyline points="12,6 12,12 16,14" fill="none" stroke="currentColor" stroke-width="2"/></svg>
       Распис.
     </div>
-    <div class="tab" data-tab="settings">
+    <div class="tab" data-tab="settings" role="tab" aria-selected="false" aria-controls="settings" id="tab-settings" tabindex="-1">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
       Настр.
     </div>
   </div>
 </div>
 
-<script>
-  // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И УТИЛИТЫ ==========
-  const DB = "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app";
-  const PASS = '1321';
-  let currentUser = null; // 'admin' или 'guest'
-  let sensorTimer, logTimer;
-  let selectedDays = new Set();
-  let currentLogFilter = 'all';
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import { getAuth, signInWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+  import { getDatabase, ref, get as dbGet, set, onValue, off } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-  // Вспомогательные функции для Firebase
-  const get = (path) => fetch(DB + path + '.json').then(r => r.json());
-  const put = (path, data) => fetch(DB + path + '.json', { method: 'PUT', body: JSON.stringify(data) });
-
-  // ========== АВТОРИЗАЦИЯ ==========
-  if (localStorage.getItem('auth') === 'admin') {
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    currentUser = 'admin';
-    initApp();
-  } else if (localStorage.getItem('auth') === 'guest') {
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    currentUser = 'guest';
-    document.getElementById('feedBtn').style.display = 'none';
-    document.getElementById('dndToggle').style.display = 'none';
-    initApp();
-  }
-
-  window.login = (withPassword) => {
-    if (withPassword) {
-      const pwd = document.getElementById('pass').value;
-      if (pwd === PASS) {
-        localStorage.setItem('auth', 'admin');
-        location.reload();
-      } else alert('Неверный пароль');
-    } else {
-      localStorage.setItem('auth', 'guest');
-      location.reload();
-    }
+  // ⚠️ Замените на свою конфигурацию Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyDummyKeyForDemo",
+    authDomain: "kormushka-app.firebaseapp.com",
+    databaseURL: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "kormushka-app",
+    storageBucket: "kormushka-app.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
   };
 
-  // ========== ОСНОВНЫЕ ФУНКЦИИ ==========
-  function initApp() {
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
+
+  // ============ Утилиты ============
+  function sanitizeHTML(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function showBanner(message, duration = 3000) {
+    const banner = document.getElementById('banner');
+    banner.textContent = message;
+    banner.classList.add('show');
+    setTimeout(() => banner.classList.remove('show'), duration);
+  }
+
+  function showError(context, error) {
+    console.error(context, error);
+    showBanner(`⚠️ Ошибка: ${error.message || 'Сетевая ошибка'}`);
+  }
+
+  // Проверка прав администратора
+  async function isAdmin() {
+    const user = auth.currentUser;
+    if (!user) return false;
+    const idTokenResult = await user.getIdTokenResult();
+    return idTokenResult.claims.admin === true;
+  }
+
+  // ============ Авторизация ============
+  const loginEl = document.getElementById('login');
+  const appEl = document.getElementById('app');
+  const adminControls = document.getElementById('adminControls');
+
+  // Подписка на изменение состояния аутентификации
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      loginEl.classList.add('hidden');
+      appEl.classList.remove('hidden');
+      const admin = user.isAnonymous ? false : await isAdmin();
+      if (admin) {
+        adminControls.classList.remove('hidden');
+      } else {
+        adminControls.classList.add('hidden');
+      }
+      initApp(admin);
+    } else {
+      loginEl.classList.remove('hidden');
+      appEl.classList.add('hidden');
+      // Очистить таймеры и подписки при выходе
+      if (window._appCleanup) window._appCleanup();
+    }
+  });
+
+  // Функции для кнопок входа
+  window.auth = {
+    signInWithEmail: async () => {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('pass').value;
+      const errorEl = document.getElementById('loginError');
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        errorEl.classList.add('hidden');
+      } catch (e) {
+        errorEl.textContent = 'Неверный email или пароль';
+        errorEl.classList.remove('hidden');
+      }
+    },
+    signInAnonymously: () => signInAnonymously(auth),
+    signOut: () => signOut(auth)
+  };
+
+  // ============ Инициализация приложения ============
+  function initApp(isAdmin) {
+    const unsubscribes = [];
+    let sensorTimer = null;
+
+    function cleanup() {
+      unsubscribes.forEach(fn => fn());
+      if (sensorTimer) clearInterval(sensorTimer);
+    }
+    window._appCleanup = cleanup;
+
+    // Настройка табов
     setupTabs();
+
+    // Настройка чипсов дней
     setupDaysChips();
-    refreshSensors();
-    refreshLog();
-    renderSchedule();
-    checkLowFood();
-    sensorTimer = setInterval(refreshSensors, 3000);
-    logTimer = setInterval(refreshLog, 15000);
-    setInterval(checkLowFood, 10000);
-    if (Notification.permission === 'default') Notification.requestPermission();
-    // Инициализация кнопки DND
-    get('/schedule_paused').then(paused => {
-      const btn = document.getElementById('dndToggle');
-      if (btn) btn.textContent = paused ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
-    });
-  }
 
-  // Табы
-  function setupTabs() {
-    document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        const target = tab.dataset.tab;
-        document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-        document.getElementById(target).classList.add('active');
-      });
-    });
-  }
-
-  // Датчики
-  async function refreshSensors() {
-    try {
-      const sensors = await get('/sensors');
-      if (sensors) {
-        document.getElementById('miskaVal').textContent = (sensors.miska || '--') + ' см';
-        document.getElementById('bakVal').textContent = (sensors.bak || '--') + ' см';
-        updateBar('miska', sensors.miska);
-        updateBar('bak', sensors.bak);
+    // Подписка на датчики в реальном времени
+    const sensorsRef = ref(db, 'sensors');
+    const unsubscribeSensors = onValue(sensorsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        updateSensorUI(data);
         setOnline(true);
       } else {
         setOnline(false);
       }
-      const rssi = await get('/wifi_rssi');
-      if (rssi !== null) document.getElementById('wifiStrength').textContent = rssi + ' dBm';
-    } catch (e) { setOnline(false); }
+    }, (error) => {
+      setOnline(false);
+      showError('Sensors subscription', error);
+    });
+    unsubscribes.push(unsubscribeSensors);
+
+    // WiFi RSSI
+    const rssiRef = ref(db, 'wifi_rssi');
+    const unsubscribeRssi = onValue(rssiRef, (snapshot) => {
+      const val = snapshot.val();
+      document.getElementById('wifiStrength').textContent = val !== null ? `${val} dBm` : '-- dBm';
+    });
+    unsubscribes.push(unsubscribeRssi);
+
+    // Подписка на лог
+    const logsRef = ref(db, 'logs');
+    const unsubscribeLogs = onValue(logsRef, (snapshot) => {
+      historyLog.processData(snapshot.val());
+    });
+    unsubscribes.push(unsubscribeLogs);
+
+    // Подписка на расписание
+    const scheduleRef = ref(db, 'schedule');
+    const unsubscribeSchedule = onValue(scheduleRef, (snapshot) => {
+      scheduling.render(snapshot.val() || []);
+    });
+    unsubscribes.push(unsubscribeSchedule);
+
+    // Подписка на DND
+    const dndRef = ref(db, 'schedule_paused');
+    const unsubscribeDnd = onValue(dndRef, (snapshot) => {
+      const paused = snapshot.val();
+      const btn = document.getElementById('dndToggle');
+      if (btn) {
+        btn.textContent = paused ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
+      }
+    });
+    unsubscribes.push(unsubscribeDnd);
+
+    // Проверка низкого уровня корма каждые 10 секунд
+    const checkFoodTimer = setInterval(async () => {
+      try {
+        const snapshot = await dbGet(ref(db, 'low_food_alert'));
+        if (snapshot.val() === true) {
+          showBanner('⚠️ В баке заканчивается корм!');
+          if (Notification.permission === 'granted') {
+            new Notification('🐱 Кормушка', { body: 'В баке заканчивается корм!', icon: '/icon-192.png' });
+          }
+        }
+      } catch (e) {
+        // игнорируем ошибки периодической проверки
+      }
+    }, 10000);
+    // Таймер тоже нужно чистить
+    const originalCleanup = cleanup;
+    window._appCleanup = () => {
+      originalCleanup();
+      clearInterval(checkFoodTimer);
+    };
+
+    // Запрос разрешения на уведомления (один раз)
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    // Инициализация калибровочных данных из базы
+    loadCalibration();
+  }
+
+  // ============ Табы ============
+  function setupTabs() {
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetId = tab.dataset.tab;
+        switchTab(targetId);
+      });
+      tab.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          tab.click();
+        }
+      });
+    });
+  }
+
+  function switchTab(targetId) {
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
+      t.setAttribute('tabindex', '-1');
+    });
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+
+    const targetTab = document.querySelector(`.tab[data-tab="${targetId}"]`);
+    const targetContent = document.getElementById(targetId);
+    if (targetTab && targetContent) {
+      targetTab.classList.add('active');
+      targetTab.setAttribute('aria-selected', 'true');
+      targetTab.setAttribute('tabindex', '0');
+      targetContent.classList.add('active');
+      targetTab.focus();
+    }
+  }
+
+  // ============ Датчики и калибровка ============
+  function updateSensorUI(sensors) {
+    document.getElementById('miskaVal').textContent = (sensors.miska != null ? sensors.miska + ' см' : '-- см');
+    document.getElementById('bakVal').textContent = (sensors.bak != null ? sensors.bak + ' см' : '-- см');
+    updateBar('miska', sensors.miska);
+    updateBar('bak', sensors.bak);
   }
 
   function updateBar(type, dist) {
-    const empty = parseFloat(localStorage.getItem(type + 'Empty') || (type === 'miska' ? 15 : 35));
-    const full = parseFloat(localStorage.getItem(type + 'Full') || (type === 'miska' ? 3 : 5));
     const bar = document.getElementById(type + 'Bar');
     const pctEl = document.getElementById(type + 'Pct');
-    if (full < empty && dist) {
+    const barContainer = bar.parentElement;
+    
+    const empty = window._calibration?.[type]?.empty;
+    const full = window._calibration?.[type]?.full;
+    
+    if (empty != null && full != null && dist != null && typeof dist === 'number' && full < empty) {
       let pct = ((empty - dist) / (empty - full)) * 100;
       pct = Math.max(0, Math.min(100, pct));
       bar.style.height = pct + '%';
       pctEl.textContent = Math.round(pct) + '%';
+      barContainer.setAttribute('aria-valuenow', Math.round(pct));
     } else {
       bar.style.height = '0%';
       pctEl.textContent = '?%';
+      barContainer.setAttribute('aria-valuenow', 0);
     }
   }
 
@@ -484,154 +685,184 @@
       '<span class="status-dot" style="background:var(--red)"></span> Офлайн';
   }
 
-  // Кормление
-  window.feed = async () => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    await put('/feed_command', true);
-    showBanner('Команда отправлена');
-  };
-
-  window.feedLater = async () => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    const h = parseInt(document.getElementById('delayH').value) || 0;
-    const m = parseInt(document.getElementById('delayM').value) || 0;
-    if (h === 0 && m === 0) return alert('Введите время');
-    await put('/feed_later', { hours: h, minutes: m });
-    showBanner('Отложенное кормление запланировано');
-  };
-
-  // Не беспокоить
-  window.toggleDND = async () => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    const current = await get('/schedule_paused');
-    const newState = !current;
-    await put('/schedule_paused', newState);
-    const btn = document.getElementById('dndToggle');
-    btn.textContent = newState ? '🔔 Выключить «Не беспокоить»' : '🔕 Включить «Не беспокоить»';
-    showBanner(newState ? 'Режим «Не беспокоить» активирован' : 'Режим «Не беспокоить» выключен');
-  };
-
-  // Лог
-  window.filterLog = (type, btn) => {
-    currentLogFilter = type;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    refreshLog();
-  };
-
-  async function refreshLog() {
-    const logs = await get('/logs');
-    const list = document.getElementById('logList');
-    if (!logs) { list.innerHTML = '<li>Нет записей</li>'; return; }
-    const dateFilter = document.getElementById('logDateFilter').value;
-    let entries = Object.entries(logs).sort((a,b) => b[0].localeCompare(a[0]));
-    if (dateFilter) {
-      entries = entries.filter(([key]) => {
-        const d = new Date(key * 1000);
-        return d.toISOString().slice(0,10) === dateFilter;
-      });
+  async function loadCalibration() {
+    try {
+      const snapshot = await dbGet(ref(db, 'calibration'));
+      const data = snapshot.val();
+      window._calibration = data || { miska: {}, bak: {} };
+    } catch (e) {
+      window._calibration = { miska: {}, bak: {} };
     }
-    if (currentLogFilter !== 'all') {
-      entries = entries.filter(([, val]) => val.type === currentLogFilter);
-    }
-    entries = entries.slice(0, 50);
-    list.innerHTML = entries.map(([key, val]) => {
-      const date = new Date(key * 1000);
-      const time = date.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-      const typeMap = { manual: 'Вручную', smart: 'Умное', schedule: 'Расписание' };
-      const type = typeMap[val.type] || val.type;
-      return `<li><span>${time}</span> <span style="color:var(--secondary);">${type}</span></li>`;
-    }).join('');
   }
 
-  // Расписание
+  // ============ Кормление ============
+  window.feeding = {
+    feedNow: async () => {
+      if (!(await isAdmin())) return showBanner('Недостаточно прав');
+      try {
+        await set(ref(db, 'feed_command'), true);
+        showBanner('Команда отправлена');
+      } catch (e) {
+        showError('feedNow', e);
+      }
+    },
+    feedLater: async () => {
+      if (!(await isAdmin())) return showBanner('Недостаточно прав');
+      const h = parseInt(document.getElementById('delayH').value) || 0;
+      const m = parseInt(document.getElementById('delayM').value) || 0;
+      if (h < 0 || h > 23 || m < 0 || m > 59) return showBanner('Некорректное время');
+      if (h === 0 && m === 0) return showBanner('Введите время');
+      try {
+        await set(ref(db, 'feed_later'), { hours: h, minutes: m });
+        showBanner('Отложенное кормление запланировано');
+      } catch (e) {
+        showError('feedLater', e);
+      }
+    }
+  };
+
+  // ============ Расписание и DND ============
+  const scheduling = {
+    selectedDays: new Set(),
+    async add() {
+      if (!(await isAdmin())) return showBanner('Недостаточно прав');
+      const time = document.getElementById('timeInput').value;
+      if (!time) return showBanner('Введите время');
+      const [h, m] = time.split(':').map(Number);
+      const days = Array.from(this.selectedDays).map(Number);
+      if (days.length === 0) return showBanner('Выберите дни');
+      try {
+        const snapshot = await dbGet(ref(db, 'schedule'));
+        const sched = snapshot.val() || [];
+        sched.push({ days, hour: h, minute: m, active: true });
+        await set(ref(db, 'schedule'), sched);
+        this.selectedDays.clear();
+        document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
+      } catch (e) {
+        showError('addSchedule', e);
+      }
+    },
+    async delete(idx) {
+      if (!(await isAdmin())) return showBanner('Недостаточно прав');
+      try {
+        const snapshot = await dbGet(ref(db, 'schedule'));
+        const sched = snapshot.val() || [];
+        sched.splice(idx, 1);
+        await set(ref(db, 'schedule'), sched);
+      } catch (e) {
+        showError('deleteSchedule', e);
+      }
+    },
+    render(scheduleArray) {
+      const list = document.getElementById('scheduleList');
+      list.innerHTML = scheduleArray.map((item, idx) => {
+        const daysStr = item.days.map(d => ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d]).join(', ');
+        const timeStr = `${item.hour}:${String(item.minute).padStart(2,'0')}`;
+        return `<li>${sanitizeHTML(daysStr)} в ${sanitizeHTML(timeStr)} 
+          <button onclick="scheduling.delete(${idx})" style="margin-left:10px; background:var(--red); color:white; border:none; border-radius:8px; padding:4px 10px;">Удалить</button></li>`;
+      }).join('');
+    },
+    async toggleDND() {
+      if (!(await isAdmin())) return showBanner('Недостаточно прав');
+      try {
+        const snapshot = await dbGet(ref(db, 'schedule_paused'));
+        const current = snapshot.val();
+        const newState = !current;
+        await set(ref(db, 'schedule_paused'), newState);
+        showBanner(newState ? 'Режим «Не беспокоить» активирован' : 'Режим «Не беспокоить» выключен');
+      } catch (e) {
+        showError('toggleDND', e);
+      }
+    }
+  };
+
   function setupDaysChips() {
     document.querySelectorAll('#daysSelect .chip').forEach(chip => {
       chip.addEventListener('click', () => {
         chip.classList.toggle('selected');
         const day = chip.dataset.day;
-        if (chip.classList.contains('selected')) selectedDays.add(day);
-        else selectedDays.delete(day);
+        if (chip.classList.contains('selected')) {
+          scheduling.selectedDays.add(day);
+        } else {
+          scheduling.selectedDays.delete(day);
+        }
       });
     });
   }
 
-  window.addSchedule = async () => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    const time = document.getElementById('timeInput').value;
-    if (!time) return alert('Введите время');
-    const [h, m] = time.split(':').map(Number);
-    const days = Array.from(selectedDays).map(Number);
-    if (days.length === 0) return alert('Выберите дни');
-    const sched = await get('/schedule') || [];
-    sched.push({ days, hour: h, minute: m, active: true });
-    await put('/schedule', sched);
-    await put('/schedule_save', sched);
-    renderSchedule();
-    selectedDays.clear();
-    document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
+  // ============ Лог ============
+  const historyLog = {
+    filter: 'all',
+    setFilter(type, btn) {
+      this.filter = type;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      this.refresh();
+    },
+    processData(logs) {
+      // данные приходят через onValue, просто рендерим с учетом фильтров
+      this.render(logs);
+    },
+    refresh() {
+      // принудительно перерисовать из последних полученных данных
+      // Так как onValue уже хранит последние данные, можно использовать принудительный get
+      dbGet(ref(db, 'logs')).then(snapshot => this.render(snapshot.val())).catch(e => showError('refreshLog', e));
+    },
+    render(logs) {
+      const list = document.getElementById('logList');
+      if (!logs) { list.innerHTML = '<li>Нет записей</li>'; return; }
+      const dateFilter = document.getElementById('logDateFilter').value;
+      let entries = Object.entries(logs).sort((a,b) => b[0].localeCompare(a[0]));
+      
+      if (dateFilter) {
+        entries = entries.filter(([key]) => {
+          const d = new Date(Number(key) * 1000);
+          return d.toISOString().slice(0,10) === dateFilter;
+        });
+      }
+      if (this.filter !== 'all') {
+        entries = entries.filter(([, val]) => val.type === this.filter);
+      }
+      entries = entries.slice(0, 50);
+      list.innerHTML = entries.map(([key, val]) => {
+        const date = new Date(Number(key) * 1000);
+        const time = date.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+        const typeMap = { manual: 'Вручную', smart: 'Умное', schedule: 'Расписание' };
+        const type = typeMap[val.type] || sanitizeHTML(val.type);
+        return `<li><span>${time}</span> <span style="color:var(--secondary);">${type}</span></li>`;
+      }).join('');
+    }
   };
 
-  async function renderSchedule() {
-    const sched = await get('/schedule') || [];
-    const list = document.getElementById('scheduleList');
-    list.innerHTML = sched.map((item, idx) => {
-      const daysStr = item.days.map(d => ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d]).join(', ');
-      return `<li>${daysStr} в ${item.hour}:${String(item.minute).padStart(2,'0')} <button onclick="deleteSchedule(${idx})" style="margin-left:10px; background:var(--red); color:white; border:none; border-radius:8px; padding:4px 10px;">Удалить</button></li>`;
-    }).join('');
-  }
+  // Установить максимальную дату для фильтра
+  document.getElementById('logDateFilter').max = new Date().toISOString().split('T')[0];
 
-  window.deleteSchedule = async (idx) => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    const sched = await get('/schedule') || [];
-    sched.splice(idx, 1);
-    await put('/schedule', sched);
-    await put('/schedule_save', sched);
-    renderSchedule();
-  };
-
-  // Настройки
-  window.calibrate = (sensor, type) => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    put('/calibrate', { sensor, type });
-    showBanner('Запрос калибровки отправлен');
-  };
-  window.setPortion = () => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    const val = document.getElementById('portionTimeInput').value;
-    if (val) put('/settings/portion', Number(val));
-    showBanner('Порция сохранена');
-  };
-  window.changePassword = () => {
-    if (currentUser !== 'admin') return alert('Требуется авторизация');
-    const newPass = document.getElementById('newPass').value;
-    if (!newPass) return;
-    localStorage.setItem('password', newPass);
-    alert('Пароль изменён. Новый пароль будет действовать после перезагрузки.');
-  };
-
-  window.logout = () => {
-    localStorage.removeItem('auth');
-    location.reload();
-  };
-
-  // Уведомления
-  function showBanner(msg) {
-    const banner = document.getElementById('banner');
-    banner.textContent = msg;
-    banner.classList.add('show');
-    setTimeout(() => banner.classList.remove('show'), 3000);
-  }
-
-  async function checkLowFood() {
-    const alert = await get('/low_food_alert');
-    if (alert === true) {
-      showBanner('⚠️ В баке заканчивается корм!');
-      if (Notification.permission === 'granted') {
-        new Notification('🐱 Кормушка', { body: 'В баке заканчивается корм!', icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' });
+  // ============ Настройки ============
+  window.settings = {
+    calibrate: async (sensor, type) => {
+      if (!(await isAdmin())) return showBanner('Недостаточно прав');
+      try {
+        await set(ref(db, 'calibrate'), { sensor, type });
+        showBanner('Запрос калибровки отправлен');
+      } catch (e) {
+        showError('calibrate', e);
+      }
+    },
+    setPortion: async () => {
+      if (!(await isAdmin())) return showBanner('Недостаточно прав');
+      const val = document.getElementById('portionTimeInput').value;
+      if (!val || isNaN(val) || val < 100 || val > 5000) return showBanner('Введите корректное значение (100-5000)');
+      try {
+        await set(ref(db, 'settings/portion'), Number(val));
+        showBanner('Порция сохранена');
+      } catch (e) {
+        showError('setPortion', e);
       }
     }
-  }
+  };
+
+  // Инициализация при загрузке страницы (если уже залогинены, onAuthStateChanged вызовется)
 </script>
 </body>
 </html>
+```
