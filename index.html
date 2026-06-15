@@ -74,25 +74,61 @@
     button {
       display: block;
       width: 100%;
-      padding: 18px;
+      padding: 16px;
       background: #007aff;
       color: white;
       border: none;
       border-radius: 16px;
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 600;
       cursor: pointer;
-      margin-top: 12px;
+      margin-top: 8px;
       box-shadow: 0 4px 12px rgba(0,122,255,0.3);
       transition: transform 0.1s;
     }
     button:active { transform: scale(0.97); }
     button:disabled { opacity: 0.5; }
+    button.secondary {
+      background: transparent;
+      color: #007aff;
+      border: 1.5px solid #007aff;
+      box-shadow: none;
+    }
+    button.danger {
+      background: #ff3b30;
+      color: white;
+      box-shadow: 0 4px 12px rgba(255,59,48,0.3);
+    }
     #status {
       text-align: center;
       margin: 12px 0;
       font-size: 15px;
       color: #555;
+    }
+    .chip {
+      display: inline-block;
+      padding: 6px 14px;
+      margin: 4px;
+      border-radius: 20px;
+      background: #e5e5ea;
+      color: #1c1c1e;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .chip.selected { background: #007aff; color: white; }
+    .schedule-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 12px;
+    }
+    .schedule-list li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 0.5px solid #e5e5ea;
     }
   </style>
 </head>
@@ -128,9 +164,28 @@
     <div id="status"></div>
   </div>
 
+  <!-- Карточка расписания -->
+  <div class="card">
+    <div class="label" style="margin-bottom:8px;">⏰ Расписание кормлений</div>
+    <div id="daysSelect" style="margin-bottom:8px;">
+      <span class="chip" data-day="1">Пн</span>
+      <span class="chip" data-day="2">Вт</span>
+      <span class="chip" data-day="3">Ср</span>
+      <span class="chip" data-day="4">Чт</span>
+      <span class="chip" data-day="5">Пт</span>
+      <span class="chip" data-day="6">Сб</span>
+      <span class="chip" data-day="0">Вс</span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input type="time" id="timeInput" class="input" value="09:00" style="flex:1; padding:10px; border:1px solid #e5e5ea; border-radius:12px; font-size:16px;">
+      <button onclick="addSchedule()" style="width:auto; margin-top:0; padding:10px 20px;">Добавить</button>
+    </div>
+    <ul id="scheduleList" class="schedule-list"></ul>
+  </div>
+
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+    import { getDatabase, ref, set, push, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
@@ -145,19 +200,26 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Калибровки (должны совпадать с прошивкой)
+    // Калибровки
     const MISKA_EMPTY = 10.0, MISKA_FULL = 3.0;
     const BAK_EMPTY = 30.0, BAK_FULL = 0.0;
 
-    // Обновление датчиков в реальном времени
+    let selectedDays = new Set();
+
+    // Датчики
     onValue(ref(db, 'sensors'), (snapshot) => {
       const data = snapshot.val() || {};
       updateDisplay(data);
     });
 
-    // Статус кормления
+    // Статус
     onValue(ref(db, 'status'), (snap) => {
       document.getElementById('status').textContent = snap.val() || '';
+    });
+
+    // Расписание
+    onValue(ref(db, 'schedule'), (snapshot) => {
+      renderSchedule(snapshot.val());
     });
 
     function updateDisplay(s) {
@@ -191,10 +253,82 @@
     function calcPercent(dist, empty, full) {
       if (empty === full) return 0;
       let pct = ((empty - dist) / (empty - full)) * 100;
-      pct = Math.max(0, Math.min(100, pct));
-      return pct;
+      return Math.max(0, Math.min(100, pct));
     }
 
+    // ---------- Расписание ----------
+    // Инициализация чипсов дней
+    document.querySelectorAll('#daysSelect .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const day = chip.dataset.day;
+        if (selectedDays.has(day)) {
+          selectedDays.delete(day);
+          chip.classList.remove('selected');
+        } else {
+          selectedDays.add(day);
+          chip.classList.add('selected');
+        }
+      });
+    });
+
+    window.addSchedule = async () => {
+      const timeVal = document.getElementById('timeInput').value;
+      if (!timeVal) return alert('Введите время');
+      if (selectedDays.size === 0) return alert('Выберите дни недели');
+
+      const [h, m] = timeVal.split(':').map(Number);
+      const daysArr = Array.from(selectedDays).map(Number);
+      
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = 'Сохранение...';
+      try {
+        await push(ref(db, 'schedule'), {
+          days: daysArr,
+          hour: h,
+          minute: m,
+          active: true
+        });
+        // Сброс выбора
+        selectedDays.clear();
+        document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
+        document.getElementById('timeInput').value = '09:00';
+      } catch (e) {
+        alert('Ошибка: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Добавить';
+      }
+    };
+
+    window.deleteSchedule = async (key) => {
+      if (!confirm('Удалить это расписание?')) return;
+      try {
+        await remove(ref(db, `schedule/${key}`));
+      } catch (e) {
+        alert('Ошибка удаления: ' + e.message);
+      }
+    };
+
+    function renderSchedule(scheduleObj) {
+      const list = document.getElementById('scheduleList');
+      if (!scheduleObj) {
+        list.innerHTML = '<li style="color:#8e8e93;">Нет расписания</li>';
+        return;
+      }
+      const entries = Object.entries(scheduleObj);
+      const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+      list.innerHTML = entries.map(([key, item]) => {
+        const daysStr = item.days.map(d => dayNames[d]).join(', ');
+        const timeStr = `${String(item.hour).padStart(2,'0')}:${String(item.minute).padStart(2,'0')}`;
+        return `<li>
+          <span>${daysStr} в ${timeStr}</span>
+          <button class="danger" style="width:auto; padding:6px 12px; font-size:14px; margin-top:0;" onclick="deleteSchedule('${key}')">Удалить</button>
+        </li>`;
+      }).join('');
+    }
+
+    // ---------- Кнопка кормления ----------
     window.sendFeed = async () => {
       const btn = document.getElementById('feedBtn');
       btn.disabled = true;
