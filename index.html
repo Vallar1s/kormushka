@@ -3,41 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Кормушка – минимальная</title>
+  <title>Кормушка</title>
   <style>
     body {
       font-family: -apple-system, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      background: #f2f2f7;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      height: 100vh; margin: 0; background: #f2f2f7;
     }
     button {
-      padding: 20px 40px;
-      font-size: 24px;
-      border: none;
-      border-radius: 16px;
-      background: #007aff;
-      color: white;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+      padding: 20px 40px; font-size: 24px;
+      border: none; border-radius: 16px;
+      background: #007aff; color: white;
+      cursor: pointer; box-shadow: 0 4px 12px rgba(0,122,255,0.3);
     }
-    button:active {
-      transform: scale(0.96);
-    }
-    button:disabled {
-      opacity: 0.6;
+    button:active { transform: scale(0.96); }
+    button:disabled { opacity: 0.6; }
+    #status {
+      margin-top: 20px; font-size: 16px; color: #555;
     }
   </style>
 </head>
 <body>
   <button id="feedBtn" onclick="sendFeed()">🥣 Покормить сейчас</button>
+  <div id="status"></div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getDatabase, ref, set } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+    import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
     const firebaseConfig = {
       apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
@@ -52,14 +45,17 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // Показываем статус
+    onValue(ref(db, 'status'), (snap) => {
+      document.getElementById('status').textContent = snap.val() || '';
+    });
+
     window.sendFeed = async () => {
       const btn = document.getElementById('feedBtn');
       btn.disabled = true;
       btn.textContent = 'Отправка...';
       try {
-        // Записываем любой не-null объект (например, true) – ESP поймёт
         await set(ref(db, 'feed_command'), true);
-        // Немного ждём и возвращаем кнопку
         setTimeout(() => {
           btn.disabled = false;
           btn.textContent = '🥣 Покормить сейчас';
