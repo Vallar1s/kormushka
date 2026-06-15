@@ -7,26 +7,126 @@
   <style>
     body {
       font-family: -apple-system, sans-serif;
-      display: flex; flex-direction: column;
-      justify-content: center; align-items: center;
-      height: 100vh; margin: 0; background: #f2f2f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      margin: 0;
+      background: #f2f2f7;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    .card {
+      background: rgba(255,255,255,0.8);
+      border-radius: 20px;
+      padding: 16px;
+      margin: 10px 0;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      backdrop-filter: blur(10px);
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .label {
+      font-size: 14px;
+      color: #8e8e93;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .value {
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .bar-container {
+      width: 30px;
+      height: 80px;
+      background: #e5e5ea;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-right: 12px;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    .bar-fill {
+      width: 100%;
+      border-radius: 10px 10px 0 0;
+      transition: height 0.5s ease;
+      background: linear-gradient(to top, #34c759, #30d158);
+    }
+    #bakFill {
+      background: linear-gradient(to top, #007aff, #5ac8fa);
+    }
+    .bar-wrapper {
+      display: flex;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .pct {
+      font-size: 16px;
+      color: #8e8e93;
+      margin-left: 8px;
     }
     button {
-      padding: 20px 40px; font-size: 24px;
-      border: none; border-radius: 16px;
-      background: #007aff; color: white;
-      cursor: pointer; box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+      display: block;
+      width: 100%;
+      padding: 18px;
+      background: #007aff;
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+      box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+      transition: transform 0.1s;
     }
-    button:active { transform: scale(0.96); }
-    button:disabled { opacity: 0.6; }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.5; }
     #status {
-      margin-top: 20px; font-size: 16px; color: #555;
+      text-align: center;
+      margin: 12px 0;
+      font-size: 15px;
+      color: #555;
     }
   </style>
 </head>
 <body>
-  <button id="feedBtn" onclick="sendFeed()">🥣 Покормить сейчас</button>
-  <div id="status"></div>
+  <div class="card">
+    <div class="row">
+      <span class="label">🥣 Миска</span>
+      <span class="value" id="miskaCm">-- см</span>
+    </div>
+    <div class="bar-wrapper">
+      <div class="bar-container">
+        <div class="bar-fill" id="miskaBar" style="height:0%"></div>
+      </div>
+      <span class="pct" id="miskaPct">0%</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <span class="label">🛢️ Бак</span>
+      <span class="value" id="bakCm">-- см</span>
+    </div>
+    <div class="bar-wrapper">
+      <div class="bar-container">
+        <div class="bar-fill" id="bakBar" style="height:0%"></div>
+      </div>
+      <span class="pct" id="bakPct">0%</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <button id="feedBtn" onclick="sendFeed()">🥣 Покормить сейчас</button>
+    <div id="status"></div>
+  </div>
 
   <script type="module">
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -45,10 +145,55 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Показываем статус
+    // Калибровки (должны совпадать с прошивкой)
+    const MISKA_EMPTY = 10.0, MISKA_FULL = 3.0;
+    const BAK_EMPTY = 30.0, BAK_FULL = 0.0;
+
+    // Обновление датчиков в реальном времени
+    onValue(ref(db, 'sensors'), (snapshot) => {
+      const data = snapshot.val() || {};
+      updateDisplay(data);
+    });
+
+    // Статус кормления
     onValue(ref(db, 'status'), (snap) => {
       document.getElementById('status').textContent = snap.val() || '';
     });
+
+    function updateDisplay(s) {
+      // Миска
+      const miskaCm = s.miska;
+      if (miskaCm != null && !isNaN(miskaCm)) {
+        document.getElementById('miskaCm').textContent = miskaCm + ' см';
+        const pct = calcPercent(miskaCm, MISKA_EMPTY, MISKA_FULL);
+        document.getElementById('miskaBar').style.height = pct + '%';
+        document.getElementById('miskaPct').textContent = Math.round(pct) + '%';
+      } else {
+        document.getElementById('miskaCm').textContent = '-- см';
+        document.getElementById('miskaBar').style.height = '0%';
+        document.getElementById('miskaPct').textContent = '?%';
+      }
+
+      // Бак
+      const bakCm = s.bak;
+      if (bakCm != null && !isNaN(bakCm)) {
+        document.getElementById('bakCm').textContent = bakCm + ' см';
+        const pct = calcPercent(bakCm, BAK_EMPTY, BAK_FULL);
+        document.getElementById('bakBar').style.height = pct + '%';
+        document.getElementById('bakPct').textContent = Math.round(pct) + '%';
+      } else {
+        document.getElementById('bakCm').textContent = '-- см';
+        document.getElementById('bakBar').style.height = '0%';
+        document.getElementById('bakPct').textContent = '?%';
+      }
+    }
+
+    function calcPercent(dist, empty, full) {
+      if (empty === full) return 0;
+      let pct = ((empty - dist) / (empty - full)) * 100;
+      pct = Math.max(0, Math.min(100, pct));
+      return pct;
+    }
 
     window.sendFeed = async () => {
       const btn = document.getElementById('feedBtn');
