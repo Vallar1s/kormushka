@@ -121,8 +121,6 @@
       user-select: none;
     }
     .chip.selected { background: #007aff; color: white; }
-    
-    /* Сетка расписания */
     .schedule-grid {
       display: flex;
       gap: 4px;
@@ -151,21 +149,14 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      position: relative;
     }
-    .time-slot .delete-time {
+    .delete-time {
       background: none;
       border: none;
       color: white;
       font-size: 14px;
-      line-height: 1;
       cursor: pointer;
-      padding: 0 2px;
-      margin-top: 2px;
-      box-shadow: none;
-    }
-    .time-slot .delete-time:active {
-      transform: scale(0.8);
+      padding: 2px;
     }
     .no-times {
       color: #c7c7cc;
@@ -177,6 +168,18 @@
       border-radius: 12px;
       font-size: 16px;
       flex: 1;
+    }
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    #lastSeen {
+      font-size: 12px;
+      color: #8e8e93;
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -212,7 +215,18 @@
     <div id="status"></div>
   </div>
 
-  <!-- Карточка расписания (сетка) -->
+  <!-- Индикатор связи -->
+  <div class="card">
+    <div class="row">
+      <span class="label">📶 Связь</span>
+      <span id="deviceStatus">
+        <span class="status-dot" style="background:#ff3b30"></span> Офлайн
+      </span>
+    </div>
+    <div id="lastSeen">--</div>
+  </div>
+
+  <!-- Расписание -->
   <div class="card">
     <div class="label" style="margin-bottom:8px;">⏰ Расписание кормлений</div>
     <div id="daysSelect" style="margin-bottom:8px;">
@@ -228,7 +242,6 @@
       <input type="time" id="timeInput" class="input" value="09:00">
       <button onclick="addSchedule()" style="width:auto; margin-top:0; padding:10px 20px;">Добавить</button>
     </div>
-    <!-- Сетка дней -->
     <div id="scheduleGrid" class="schedule-grid"></div>
   </div>
 
@@ -251,7 +264,6 @@
 
     const MISKA_EMPTY = 10.0, MISKA_FULL = 3.0;
     const BAK_EMPTY = 30.0, BAK_FULL = 0.0;
-
     let selectedDays = new Set();
     const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
@@ -266,7 +278,30 @@
       document.getElementById('status').textContent = snap.val() || '';
     });
 
-    // Расписание (агрегируем по дням для сетки)
+    // Мониторинг связи: last_seen
+    onValue(ref(db, 'device/last_seen'), (snapshot) => {
+      const lastSeen = snapshot.val();
+      const statusEl = document.getElementById('deviceStatus');
+      const lastSeenEl = document.getElementById('lastSeen');
+      if (lastSeen && !isNaN(lastSeen)) {
+        const now = Math.floor(Date.now() / 1000);
+        const diff = now - lastSeen;
+        if (diff < 15) {
+          statusEl.innerHTML = '<span class="status-dot" style="background:#34c759"></span> Онлайн';
+          lastSeenEl.textContent = '';
+        } else {
+          statusEl.innerHTML = '<span class="status-dot" style="background:#ff3b30"></span> Офлайн';
+          const d = new Date(lastSeen * 1000);
+          const timeStr = d.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+          lastSeenEl.textContent = 'Последняя активность: ' + timeStr;
+        }
+      } else {
+        statusEl.innerHTML = '<span class="status-dot" style="background:#ff3b30"></span> Офлайн';
+        lastSeenEl.textContent = 'Нет данных';
+      }
+    });
+
+    // Расписание
     onValue(ref(db, 'schedule'), (snapshot) => {
       renderScheduleGrid(snapshot.val());
     });
@@ -303,7 +338,6 @@
       return Math.max(0, Math.min(100, pct));
     }
 
-    // Инициализация чипсов
     document.querySelectorAll('#daysSelect .chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const day = chip.dataset.day;
@@ -321,20 +355,13 @@
       const timeVal = document.getElementById('timeInput').value;
       if (!timeVal) return alert('Введите время');
       if (selectedDays.size === 0) return alert('Выберите дни недели');
-
       const [h, m] = timeVal.split(':').map(Number);
       const daysArr = Array.from(selectedDays).map(Number);
-      
       const btn = event.target;
       btn.disabled = true;
       btn.textContent = 'Сохранение...';
       try {
-        await push(ref(db, 'schedule'), {
-          days: daysArr,
-          hour: h,
-          minute: m,
-          active: true
-        });
+        await push(ref(db, 'schedule'), { days: daysArr, hour: h, minute: m, active: true });
         selectedDays.clear();
         document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
         document.getElementById('timeInput').value = '09:00';
@@ -357,38 +384,26 @@
 
     function renderScheduleGrid(scheduleObj) {
       const grid = document.getElementById('scheduleGrid');
-      // Создаём структуру для 7 дней: каждый день — массив {time, key}
       const days = Array.from({length: 7}, () => []);
-      
       if (scheduleObj) {
         Object.entries(scheduleObj).forEach(([key, entry]) => {
           if (!entry.active) return;
           const timeStr = `${String(entry.hour).padStart(2,'0')}:${String(entry.minute).padStart(2,'0')}`;
-          entry.days.forEach(day => {
-            days[day].push({ time: timeStr, key: key });
-          });
+          entry.days.forEach(day => days[day].push({ time: timeStr, key }));
         });
       }
-
-      // Сортируем времена в каждом дне
       days.forEach(arr => arr.sort((a, b) => a.time.localeCompare(b.time)));
-
-      // Строим HTML сетки
       let html = '';
       for (let d = 0; d < 7; d++) {
-        html += `<div class="day-column">`;
-        html += `<div class="day-header">${dayNames[d]}</div>`;
+        html += `<div class="day-column"><div class="day-header">${dayNames[d]}</div>`;
         if (days[d].length === 0) {
-          html += `<div class="no-times">—</div>`;
+          html += '<div class="no-times">—</div>';
         } else {
           days[d].forEach(item => {
-            html += `<div class="time-slot">
-              <span>${item.time}</span>
-              <button class="delete-time" onclick="deleteSchedule('${item.key}')" title="Удалить">✕</button>
-            </div>`;
+            html += `<div class="time-slot"><span>${item.time}</span><button class="delete-time" onclick="deleteSchedule('${item.key}')" title="Удалить">✕</button></div>`;
           });
         }
-        html += `</div>`;
+        html += '</div>';
       }
       grid.innerHTML = html;
     }
