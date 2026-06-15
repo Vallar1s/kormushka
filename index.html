@@ -246,184 +246,201 @@
   </div>
 
   <script type="module">
-    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-    import { getDatabase, ref, set, push, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import { getDatabase, ref, set, push, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
-      authDomain: "kormushka-app.firebaseapp.com",
-      databaseURL: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "kormushka-app",
-      storageBucket: "kormushka-app.firebasestorage.app",
-      messagingSenderId: "414413182022",
-      appId: "1:414413182022:web:ab2133d2ccf624c0eee647"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyCWn-1-YrkgjnO9jygkHL3QbprG8QS5PAU",
+    authDomain: "kormushka-app.firebaseapp.com",
+    databaseURL: "https://kormushka-app-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "kormushka-app",
+    storageBucket: "kormushka-app.firebasestorage.app",
+    messagingSenderId: "414413182022",
+    appId: "1:414413182022:web:ab2133d2ccf624c0eee647"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
-    const MISKA_EMPTY = 10.0, MISKA_FULL = 3.0;
-    const BAK_EMPTY = 30.0, BAK_FULL = 0.0;
-    let selectedDays = new Set();
-    const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const MISKA_EMPTY = 10.0, MISKA_FULL = 3.0;
+  const BAK_EMPTY = 30.0, BAK_FULL = 0.0;
+  let selectedDays = new Set();
+  const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
-    // Датчики
-    onValue(ref(db, 'sensors'), (snapshot) => {
-      const data = snapshot.val() || {};
-      updateDisplay(data);
-    });
+  // Для отслеживания связи: последнее полученное значение last_seen (unixtime)
+  let lastSeenValue = null;
 
-    // Статус
-    onValue(ref(db, 'status'), (snap) => {
-      document.getElementById('status').textContent = snap.val() || '';
-    });
+  // Датчики
+  onValue(ref(db, 'sensors'), (snapshot) => {
+    const data = snapshot.val() || {};
+    updateDisplay(data);
+  });
 
-    // Мониторинг связи: last_seen
-    onValue(ref(db, 'device/last_seen'), (snapshot) => {
-      const lastSeen = snapshot.val();
-      const statusEl = document.getElementById('deviceStatus');
-      const lastSeenEl = document.getElementById('lastSeen');
-      if (lastSeen && !isNaN(lastSeen)) {
-        const now = Math.floor(Date.now() / 1000);
-        const diff = now - lastSeen;
-        if (diff < 15) {
-          statusEl.innerHTML = '<span class="status-dot" style="background:#34c759"></span> Онлайн';
-          lastSeenEl.textContent = '';
-        } else {
-          statusEl.innerHTML = '<span class="status-dot" style="background:#ff3b30"></span> Офлайн';
-          const d = new Date(lastSeen * 1000);
-          const timeStr = d.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
-          lastSeenEl.textContent = 'Последняя активность: ' + timeStr;
-        }
-      } else {
-        statusEl.innerHTML = '<span class="status-dot" style="background:#ff3b30"></span> Офлайн';
-        lastSeenEl.textContent = 'Нет данных';
-      }
-    });
+  // Статус
+  onValue(ref(db, 'status'), (snap) => {
+    document.getElementById('status').textContent = snap.val() || '';
+  });
 
-    // Расписание
-    onValue(ref(db, 'schedule'), (snapshot) => {
-      renderScheduleGrid(snapshot.val());
-    });
+  // Мониторинг связи: запоминаем метку и сразу обновляем интерфейс
+  onValue(ref(db, 'device/last_seen'), (snapshot) => {
+    const val = snapshot.val();
+    if (val && !isNaN(val)) {
+      lastSeenValue = val;
+    } else {
+      lastSeenValue = null;
+    }
+    updateConnectionStatus();
+  });
 
-    function updateDisplay(s) {
-      const miskaCm = s.miska;
-      if (miskaCm != null && !isNaN(miskaCm)) {
-        document.getElementById('miskaCm').textContent = miskaCm + ' см';
-        const pct = calcPercent(miskaCm, MISKA_EMPTY, MISKA_FULL);
-        document.getElementById('miskaBar').style.height = pct + '%';
-        document.getElementById('miskaPct').textContent = Math.round(pct) + '%';
-      } else {
-        document.getElementById('miskaCm').textContent = '-- см';
-        document.getElementById('miskaBar').style.height = '0%';
-        document.getElementById('miskaPct').textContent = '?%';
-      }
+  // Периодически (каждые 5 сек) проверяем, не устарела ли метка
+  setInterval(() => {
+    updateConnectionStatus();
+  }, 5000);
 
-      const bakCm = s.bak;
-      if (bakCm != null && !isNaN(bakCm)) {
-        document.getElementById('bakCm').textContent = bakCm + ' см';
-        const pct = calcPercent(bakCm, BAK_EMPTY, BAK_FULL);
-        document.getElementById('bakBar').style.height = pct + '%';
-        document.getElementById('bakPct').textContent = Math.round(pct) + '%';
-      } else {
-        document.getElementById('bakCm').textContent = '-- см';
-        document.getElementById('bakBar').style.height = '0%';
-        document.getElementById('bakPct').textContent = '?%';
-      }
+  function updateConnectionStatus() {
+    const statusEl = document.getElementById('deviceStatus');
+    const lastSeenEl = document.getElementById('lastSeen');
+    if (lastSeenValue === null) {
+      statusEl.innerHTML = '<span class="status-dot" style="background:#ff3b30"></span> Офлайн';
+      lastSeenEl.textContent = 'Нет данных';
+      return;
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const diff = now - lastSeenValue;
+    if (diff < 15) {
+      statusEl.innerHTML = '<span class="status-dot" style="background:#34c759"></span> Онлайн';
+      lastSeenEl.textContent = '';
+    } else {
+      statusEl.innerHTML = '<span class="status-dot" style="background:#ff3b30"></span> Офлайн';
+      const d = new Date(lastSeenValue * 1000);
+      const timeStr = d.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      lastSeenEl.textContent = 'Последняя активность: ' + timeStr;
+    }
+  }
+
+  // Расписание
+  onValue(ref(db, 'schedule'), (snapshot) => {
+    renderScheduleGrid(snapshot.val());
+  });
+
+  function updateDisplay(s) {
+    const miskaCm = s.miska;
+    if (miskaCm != null && !isNaN(miskaCm)) {
+      document.getElementById('miskaCm').textContent = miskaCm + ' см';
+      const pct = calcPercent(miskaCm, MISKA_EMPTY, MISKA_FULL);
+      document.getElementById('miskaBar').style.height = pct + '%';
+      document.getElementById('miskaPct').textContent = Math.round(pct) + '%';
+    } else {
+      document.getElementById('miskaCm').textContent = '-- см';
+      document.getElementById('miskaBar').style.height = '0%';
+      document.getElementById('miskaPct').textContent = '?%';
     }
 
-    function calcPercent(dist, empty, full) {
-      if (empty === full) return 0;
-      let pct = ((empty - dist) / (empty - full)) * 100;
-      return Math.max(0, Math.min(100, pct));
+    const bakCm = s.bak;
+    if (bakCm != null && !isNaN(bakCm)) {
+      document.getElementById('bakCm').textContent = bakCm + ' см';
+      const pct = calcPercent(bakCm, BAK_EMPTY, BAK_FULL);
+      document.getElementById('bakBar').style.height = pct + '%';
+      document.getElementById('bakPct').textContent = Math.round(pct) + '%';
+    } else {
+      document.getElementById('bakCm').textContent = '-- см';
+      document.getElementById('bakBar').style.height = '0%';
+      document.getElementById('bakPct').textContent = '?%';
     }
+  }
 
-    document.querySelectorAll('#daysSelect .chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const day = chip.dataset.day;
-        if (selectedDays.has(day)) {
-          selectedDays.delete(day);
-          chip.classList.remove('selected');
-        } else {
-          selectedDays.add(day);
-          chip.classList.add('selected');
-        }
+  function calcPercent(dist, empty, full) {
+    if (empty === full) return 0;
+    let pct = ((empty - dist) / (empty - full)) * 100;
+    return Math.max(0, Math.min(100, pct));
+  }
+
+  document.querySelectorAll('#daysSelect .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const day = chip.dataset.day;
+      if (selectedDays.has(day)) {
+        selectedDays.delete(day);
+        chip.classList.remove('selected');
+      } else {
+        selectedDays.add(day);
+        chip.classList.add('selected');
+      }
+    });
+  });
+
+  window.addSchedule = async () => {
+    const timeVal = document.getElementById('timeInput').value;
+    if (!timeVal) return alert('Введите время');
+    if (selectedDays.size === 0) return alert('Выберите дни недели');
+    const [h, m] = timeVal.split(':').map(Number);
+    const daysArr = Array.from(selectedDays).map(Number);
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Сохранение...';
+    try {
+      await push(ref(db, 'schedule'), { days: daysArr, hour: h, minute: m, active: true });
+      selectedDays.clear();
+      document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
+      document.getElementById('timeInput').value = '09:00';
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Добавить';
+    }
+  };
+
+  window.deleteSchedule = async (key) => {
+    if (!confirm('Удалить это расписание?')) return;
+    try {
+      await remove(ref(db, `schedule/${key}`));
+    } catch (e) {
+      alert('Ошибка удаления: ' + e.message);
+    }
+  };
+
+  function renderScheduleGrid(scheduleObj) {
+    const grid = document.getElementById('scheduleGrid');
+    const days = Array.from({length: 7}, () => []);
+    if (scheduleObj) {
+      Object.entries(scheduleObj).forEach(([key, entry]) => {
+        if (!entry.active) return;
+        const timeStr = `${String(entry.hour).padStart(2,'0')}:${String(entry.minute).padStart(2,'0')}`;
+        entry.days.forEach(day => days[day].push({ time: timeStr, key }));
       });
-    });
-
-    window.addSchedule = async () => {
-      const timeVal = document.getElementById('timeInput').value;
-      if (!timeVal) return alert('Введите время');
-      if (selectedDays.size === 0) return alert('Выберите дни недели');
-      const [h, m] = timeVal.split(':').map(Number);
-      const daysArr = Array.from(selectedDays).map(Number);
-      const btn = event.target;
-      btn.disabled = true;
-      btn.textContent = 'Сохранение...';
-      try {
-        await push(ref(db, 'schedule'), { days: daysArr, hour: h, minute: m, active: true });
-        selectedDays.clear();
-        document.querySelectorAll('#daysSelect .chip').forEach(c => c.classList.remove('selected'));
-        document.getElementById('timeInput').value = '09:00';
-      } catch (e) {
-        alert('Ошибка: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Добавить';
-      }
-    };
-
-    window.deleteSchedule = async (key) => {
-      if (!confirm('Удалить это расписание?')) return;
-      try {
-        await remove(ref(db, `schedule/${key}`));
-      } catch (e) {
-        alert('Ошибка удаления: ' + e.message);
-      }
-    };
-
-    function renderScheduleGrid(scheduleObj) {
-      const grid = document.getElementById('scheduleGrid');
-      const days = Array.from({length: 7}, () => []);
-      if (scheduleObj) {
-        Object.entries(scheduleObj).forEach(([key, entry]) => {
-          if (!entry.active) return;
-          const timeStr = `${String(entry.hour).padStart(2,'0')}:${String(entry.minute).padStart(2,'0')}`;
-          entry.days.forEach(day => days[day].push({ time: timeStr, key }));
+    }
+    days.forEach(arr => arr.sort((a, b) => a.time.localeCompare(b.time)));
+    let html = '';
+    for (let d = 0; d < 7; d++) {
+      html += `<div class="day-column"><div class="day-header">${dayNames[d]}</div>`;
+      if (days[d].length === 0) {
+        html += '<div class="no-times">—</div>';
+      } else {
+        days[d].forEach(item => {
+          html += `<div class="time-slot"><span>${item.time}</span><button class="delete-time" onclick="deleteSchedule('${item.key}')" title="Удалить">✕</button></div>`;
         });
       }
-      days.forEach(arr => arr.sort((a, b) => a.time.localeCompare(b.time)));
-      let html = '';
-      for (let d = 0; d < 7; d++) {
-        html += `<div class="day-column"><div class="day-header">${dayNames[d]}</div>`;
-        if (days[d].length === 0) {
-          html += '<div class="no-times">—</div>';
-        } else {
-          days[d].forEach(item => {
-            html += `<div class="time-slot"><span>${item.time}</span><button class="delete-time" onclick="deleteSchedule('${item.key}')" title="Удалить">✕</button></div>`;
-          });
-        }
-        html += '</div>';
-      }
-      grid.innerHTML = html;
+      html += '</div>';
     }
+    grid.innerHTML = html;
+  }
 
-    window.sendFeed = async () => {
-      const btn = document.getElementById('feedBtn');
-      btn.disabled = true;
-      btn.textContent = 'Отправка...';
-      try {
-        await set(ref(db, 'feed_command'), true);
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.textContent = '🥣 Покормить сейчас';
-        }, 2000);
-      } catch (e) {
-        alert('Ошибка: ' + e.message);
+  window.sendFeed = async () => {
+    const btn = document.getElementById('feedBtn');
+    btn.disabled = true;
+    btn.textContent = 'Отправка...';
+    try {
+      await set(ref(db, 'feed_command'), true);
+      setTimeout(() => {
         btn.disabled = false;
         btn.textContent = '🥣 Покормить сейчас';
-      }
-    };
-  </script>
+      }, 2000);
+    } catch (e) {
+      alert('Ошибка: ' + e.message);
+      btn.disabled = false;
+      btn.textContent = '🥣 Покормить сейчас';
+    }
+  };
+</script>
 </body>
 </html>
